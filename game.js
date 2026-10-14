@@ -1179,7 +1179,9 @@ class GameController {
     this.canvas = document.getElementById('cafe-canvas');
     this.renderer = new PixelSceneRenderer(this.canvas);
 
-    this.currentThemeKey = 'night';
+    const urlParams = new URLSearchParams(window.location.search);
+    const sceneParam = urlParams.get('scene');
+    this.currentThemeKey = (sceneParam && SCENE_CONFIGS[sceneParam]) ? sceneParam : 'night';
     this.coins = 0;
     this.hearts = 0;
     this.catState = 'sleep';
@@ -1378,7 +1380,7 @@ class GameController {
     // Show/hide Pet Cat button based on cat availability in scene
     const btnCat = document.getElementById('btn-quick-pet-cat');
     if (btnCat) {
-      btnCat.style.display = sceneCfg.cat ? 'flex' : 'none';
+      btnCat.style.display = sceneCfg.cat ? 'inline-flex' : 'none';
     }
 
     // Typewriter dialogue (cốt truyện theo cờ)

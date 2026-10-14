@@ -190,6 +190,93 @@ body {
   }
 }
 
+@media (max-width: 600px) {
+  html, body {
+    overflow-x: hidden;
+    width: 100%;
+  }
+  body {
+    padding: 6px;
+    display: block;
+  }
+  .app-container {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+  .top-nav {
+    min-width: 0;
+    max-width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 8px;
+    gap: 8px;
+    overflow: hidden;
+  }
+  .theme-selector {
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .audio-controls {
+    min-width: 0;
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+  .main-stage {
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+  }
+  .viewport-card {
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+  }
+  .canvas-wrapper {
+    width: 100%;
+    max-width: 100%;
+  }
+  .btn-canvas-cat {
+    font-size: 0.7rem;
+    padding: 5px 12px;
+    margin-top: 6px;
+    margin-right: 2px;
+    align-self: flex-end;
+  }
+  .dialogue-box {
+    padding: 10px;
+    gap: 10px;
+    min-height: auto;
+  }
+  .customer-avatar-frame {
+    width: 56px;
+    height: 56px;
+    flex-shrink: 0;
+  }
+  .dialogue-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .customer-status-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .customer-actions-mini {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
 /* --- Left: Viewport & RPG Dialogue --- */
 .viewport-card {
   display: flex;
@@ -240,9 +327,8 @@ body {
 }
 
 .btn-canvas-cat {
-  position: absolute;
-  bottom: 12px;
-  right: 14px;
+  align-self: flex-end;
+  margin-top: 8px;
   background: rgba(15, 23, 42, 0.94);
   border: 1px solid rgba(245, 158, 11, 0.5);
   color: var(--accent-warm);
@@ -253,7 +339,9 @@ body {
   cursor: pointer;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
   transition: transform 0.15s ease, background 0.15s ease;
-  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .btn-canvas-cat:hover {
@@ -1188,29 +1276,6 @@ body {
   50% { box-shadow: 0 0 14px rgba(245, 158, 11, 0.7); }
 }
 
-/* Quick Pet Cat Button on Canvas */
-.btn-canvas-cat {
-  position: absolute;
-  bottom: 12px;
-  right: 14px;
-  background: rgba(15, 23, 42, 0.88);
-  border: 1px solid rgba(254, 240, 138, 0.4);
-  color: #fef08a;
-  padding: 5px 12px;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  font-family: var(--pixel-font);
-  cursor: pointer;
-  backdrop-filter: blur(8px);
-  transition: all 0.2s ease;
-  z-index: 10;
-}
-
-.btn-canvas-cat:hover {
-  background: rgba(245, 158, 11, 0.35);
-  border-color: #f59e0b;
-  transform: translateY(-2px) scale(1.05);
-}
 
 /* Skip/Next Customer Mini Button */
 .customer-actions-mini {
