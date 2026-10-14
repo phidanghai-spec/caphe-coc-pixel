@@ -2592,6 +2592,19 @@ class GameController {
     this.spawnFloatingHeart(window.innerWidth / 2, window.innerHeight / 2);
     this.showToast(`💖 Nhận được +${bonus} Trái Tim thân thiết từ khách!`);
 
+    // Chương 2 Milestone Toast Hooks
+    if (choice.effects) {
+      if (choice.effects.ba_lan_thu && !this.story.flags.ba_lan_thu) {
+        setTimeout(() => this.showToast('📖 Chương 2: Bức thư cũ trong cuốn sổ cờ tướng!'), 650);
+      } else if (choice.effects.ba_lan_gap_lai && !this.story.flags.ba_lan_gap_lai) {
+        setTimeout(() => this.showToast('📖 Chương 2: Nhận lời gửi gắm tới cô Lan Hội An!'), 650);
+      } else if (choice.effects.lam_hoa_startup && !this.story.flags.lam_hoa_startup) {
+        setTimeout(() => this.showToast('📖 Chương 2: Hoa & Lâm bắt đầu dự án khởi nghiệp!'), 650);
+      } else if (choice.effects.vinh_wave && !this.story.flags.vinh_wave) {
+        setTimeout(() => this.showToast('📖 Chương 2: Chuyện chiếc Wave cũ của chú Vinh!'), 650);
+      }
+    }
+
     const event = this.story.applyEffects(choice.effects);
     if (event === 'ending') {
       this.triggerEnding();

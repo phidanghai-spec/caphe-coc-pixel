@@ -8,7 +8,11 @@ const STORY_DEFAULT_FLAGS = {
   lam_ho_tro: false,
   ba_gui_qua: false,
   lan_biet_chuyen: false,
-  ket_thuc: false
+  ket_thuc: false,
+  ba_lan_thu: false,
+  ba_lan_gap_lai: false,
+  vinh_wave: false,
+  lam_hoa_startup: false
 };
 
 // Mỗi dòng có thể có "when" (điều kiện theo cờ). Dòng đầu tiên khớp sẽ được dùng,
@@ -16,6 +20,8 @@ const STORY_DEFAULT_FLAGS = {
 const STORY_SCENES = {
   night: {
     arrive: [
+      { when: f => f.ket_thuc && !f.vinh_wave,
+        text: 'Con biết không, chiếc Wave này chú chạy từ hồi con còn nhỏ. Nó nuôi hai đứa con học đại học đó.' },
       { when: f => f.o_vang_dang_tin && !f.o_vang_o_quan,
         text: 'Chú nghe nói có người tìm ô vàng trong nhóm rồi đó con. Chú chưa kịp trả, con giữ giùm chú ly này rồi tính tiếp nghen...' },
       { when: f => f.o_vang_o_quan,
@@ -23,6 +29,10 @@ const STORY_SCENES = {
       { text: 'Cho chú ly cà phê sữa đá nhiều sữa nghen con. Chạy cuốc cuối đêm mưa ướt sũng cả áo rồi... Hồi chiều chú chở một cô gái, xuống xe chú mới thấy cái ô vàng quên trên xe luôn á.' }
     ],
     choices: [
+      { text: 'Chú kể con nghe về chiếc xe đi.',
+        when: f => f.ket_thuc && !f.vinh_wave,
+        reply: 'Mỗi cuốc xe là một tiền học phí. Hai đứa nó tốt nghiệp rồi, giờ chú chỉ mong xe chạy thêm vài năm nữa.',
+        bonusHearts: 2, effects: { vinh_wave: true } },
       { text: 'Chú để cái ô vàng lại đây, con giữ giúp chủ nhân.',
         when: f => !f.o_vang_o_quan,
         reply: 'Ừa, vậy chú yên tâm rồi. Có ai tới hỏi thì con nói giùm chú nghen!',
@@ -70,11 +80,17 @@ const STORY_SCENES = {
 
   indoor: {
     arrive: [
+      { when: f => f.ket_thuc && !f.lam_hoa_startup,
+        text: 'Hoa với anh đang bàn chuyện làm app từ đồ án tốt nghiệp đó em. Em kể thử xem, ý tưởng của em tới đâu rồi?' },
       { when: f => f.o_vang_dang_tin && !f.lam_ho_tro,
         text: 'Hồi sáng có bài đăng tìm cái ô vàng trong nhóm xe ôm, anh thấy rồi. Mà anh đang bận sửa server, em làm ly nhanh giùm anh nha.' },
       { text: 'Làm cho anh ly Cà Phê Muối béo mặn xứ Huế nha em. Kèm lát bánh Tiramisu phô mai, bug server dí từ sáng, cần sốc lại tinh thần...' }
     ],
     choices: [
+      { text: 'Hai bạn làm chung app đi, anh có kinh nghiệm backend em lo phần giao diện.',
+        when: f => f.ket_thuc && !f.lam_hoa_startup,
+        reply: 'Vậy là chốt nha! Mình bắt đầu từ bản prototype tuần này.',
+        bonusHearts: 3, effects: { lam_hoa_startup: true } },
       { text: 'Server lại 500 hả anh? Uống ly này rồi fix trong một nốt nhạc!',
         reply: 'Haha chuẩn em ơi, caffeine và kem muối béo mặn là thuốc giải duy nhất lúc này!',
         bonusHearts: 3 },
@@ -94,9 +110,19 @@ const STORY_SCENES = {
 
   morning: {
     arrive: [
+      { when: f => f.ket_thuc && !f.ba_lan_thu,
+        text: 'Sáng nay bác tới sớm hơn mọi hôm, ngồi xuống đi con. Bác đang dở ván cờ với mấy ông bạn già.' },
       { text: 'Cho bác ly Cà Phê Đen Đá đậm đà không đường con nhé. Kèm ổ bánh mì pa-tê giòn rụm, sáng ra làm ván cờ với mấy ông bạn già là thú vui tao nhã...' }
     ],
     choices: [
+      { text: 'Bác ơi, cuốn sổ cờ tướng của bác kẹp cái gì vậy?',
+        when: f => f.ket_thuc && !f.ba_lan_thu,
+        reply: 'Ừ... là bức thư cũ của cô Lan. Bác giữ hơn ba chục năm rồi, chuyến xe bus Hà Nội – Hội An năm đó, bác chưa kịp nói.',
+        bonusHearts: 3, effects: { ba_lan_thu: true } },
+      { text: 'Hay con đem thư này tới Hội An giùm bác, nếu cô Lan còn ở đó.',
+        when: f => f.ket_thuc && f.ba_lan_thu && !f.ba_lan_gap_lai,
+        reply: 'Cảm ơn con. Nếu gặp, con nói bác vẫn còn nhớ.',
+        bonusHearts: 2, effects: { ba_lan_gap_lai: true } },
       { text: 'Dạ bác ngồi bàn gió mát nghen, sáng nay bác thắng ván nào chưa ạ?',
         reply: 'Haha bác vừa chiếu bí ông Tám một ván giòn giã con ạ!',
         bonusHearts: 3 },
