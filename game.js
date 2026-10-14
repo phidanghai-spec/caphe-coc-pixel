@@ -1640,31 +1640,56 @@ class GameController {
 
   // --- TYPEWRITER EFFECT & AUDIO BLIP ---
   typewriterText(fullText) {
+    if (this.typewriterRafId) {
+      cancelAnimationFrame(this.typewriterRafId);
+      this.typewriterRafId = null;
+    }
     if (this.typewriterTimer) {
       clearInterval(this.typewriterTimer);
+      this.typewriterTimer = null;
     }
     const textElem = document.getElementById('speech-text');
     textElem.textContent = '';
     this.currentSpeechFull = fullText;
     this.isTyping = true;
 
-    let charIdx = 0;
-    this.typewriterTimer = setInterval(() => {
-      if (charIdx < fullText.length) {
-        textElem.textContent += fullText[charIdx];
-        if (charIdx % 3 === 0) {
+    const charInterval = 28; // 28ms per character
+    const minBlipInterval = 84; // max blip sound every 84ms
+    const startTime = performance.now();
+    let lastBlipTime = 0;
+    let lastRenderedChars = 0;
+
+    const step = (currentTime) => {
+      if (!this.isTyping) return;
+      const elapsed = currentTime - startTime;
+      const charCount = Math.min(fullText.length, Math.floor(elapsed / charInterval));
+
+      if (charCount !== lastRenderedChars) {
+        textElem.textContent = fullText.slice(0, charCount);
+        lastRenderedChars = charCount;
+
+        if (this.isTyping && currentTime - lastBlipTime >= minBlipInterval) {
           this.sound.playDialogueBlip();
+          lastBlipTime = currentTime;
         }
-        charIdx++;
+      }
+
+      if (charCount < fullText.length) {
+        this.typewriterRafId = requestAnimationFrame(step);
       } else {
-        clearInterval(this.typewriterTimer);
-        this.typewriterTimer = null;
+        this.typewriterRafId = null;
         this.isTyping = false;
       }
-    }, 28);
+    };
+
+    this.typewriterRafId = requestAnimationFrame(step);
   }
 
   fastForwardTypewriter() {
+    if (this.typewriterRafId) {
+      cancelAnimationFrame(this.typewriterRafId);
+      this.typewriterRafId = null;
+    }
     if (this.typewriterTimer) {
       clearInterval(this.typewriterTimer);
       this.typewriterTimer = null;
