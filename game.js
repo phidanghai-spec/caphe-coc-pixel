@@ -416,6 +416,25 @@ class SoundEngine {
 
 // --- 2. AGENT SPRITE FORGE: SPRITE ATLAS LOADER & CLIP PLAYER ---
 
+const SPRITE_ATLAS_KEYS = ['vinh', 'hoa', 'lam', 'owner'];
+let spriteAtlasIndexCache = null;
+
+async function getAvailableSpriteAtlases() {
+  if (spriteAtlasIndexCache !== null) return spriteAtlasIndexCache;
+  try {
+    const res = await fetch('assets/sprites/index.json');
+    if (res.ok) {
+      const data = await res.json();
+      if (data && Array.isArray(data.available)) {
+        spriteAtlasIndexCache = new Set(data.available);
+        return spriteAtlasIndexCache;
+      }
+    }
+  } catch (_) {}
+  spriteAtlasIndexCache = new Set();
+  return spriteAtlasIndexCache;
+}
+
 /**
  * Loads an Aseprite JSON atlas & engine export for a given character spriteKey.
  * Structure expected:
@@ -425,6 +444,16 @@ class SoundEngine {
  * Returns Promise<{clips, image, anchor, frameW, frameH, engineExport}> or null on missing files.
  */
 async function loadSpriteAtlas(key) {
+  if (!key || typeof key !== 'string' || !SPRITE_ATLAS_KEYS.includes(key)) {
+    return null;
+  }
+
+  // Prevent 404 network console spam: verify atlas availability via manifest
+  const available = await getAvailableSpriteAtlases();
+  if (!available.has(key)) {
+    return null;
+  }
+
   try {
     // 1. Fetch engine-export.json (optional, prioritized for anchor_px)
     let engineExport = null;
@@ -435,7 +464,7 @@ async function loadSpriteAtlas(key) {
       }
     } catch (_) {}
 
-    // 2. Fetch Aseprite JSON: try key.json first
+    // 2. Fetch Aseprite JSON: try key.json
     let aseData = null;
     let jsonName = key;
     try {
@@ -444,20 +473,6 @@ async function loadSpriteAtlas(key) {
         aseData = await res.json();
       }
     } catch (_) {}
-
-    if (!aseData) {
-      // Fallback filename checks
-      for (const fallbackName of ['animation', 'atlas', 'spritesheet']) {
-        try {
-          const res = await fetch(`assets/sprites/${key}/aseprite/${fallbackName}.json`);
-          if (res.ok) {
-            aseData = await res.json();
-            jsonName = fallbackName;
-            break;
-          }
-        } catch (_) {}
-      }
-    }
 
     if (!aseData || !aseData.frames) {
       return null; // Missing atlas file, fallback gracefully
