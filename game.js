@@ -1325,6 +1325,26 @@ class GameController {
       }
     });
 
+    // Canvas hover: wake up cat when cursor approaches
+    this.canvas.addEventListener('mousemove', (e) => {
+      const rect = this.canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * (this.canvas.width / rect.width);
+      const y = (e.clientY - rect.top) * (this.canvas.height / rect.height);
+      const sceneCfg = SCENE_CONFIGS[this.currentThemeKey];
+      const cat = sceneCfg && sceneCfg.cat;
+      if (cat && x >= cat.x - 6 && x <= cat.x + cat.w + 6 && y >= cat.y - 6 && y <= cat.y + cat.h + 6) {
+        if (this.catState === 'sleep') {
+          this.catState = 'awake';
+          clearTimeout(this.catAwakeTimer);
+          this.catAwakeTimer = setTimeout(() => {
+            if (this.catState === 'awake') {
+              this.catState = 'sleep';
+            }
+          }, 3500);
+        }
+      }
+    });
+
     // Whisking Action button
     document.getElementById('btn-whisk-action').addEventListener('click', () => this.whiskEggStep());
 
@@ -1756,8 +1776,14 @@ class GameController {
   petCat(e) {
     this.catState = 'happy';
     clearTimeout(this.catHappyTimer);
+    clearTimeout(this.catAwakeTimer);
     this.catHappyTimer = setTimeout(() => {
-      this.catState = 'sleep';
+      this.catState = 'awake';
+      this.catAwakeTimer = setTimeout(() => {
+        if (this.catState === 'awake') {
+          this.catState = 'sleep';
+        }
+      }, 3500);
     }, 800);
 
     this.sound.playMeowSound();
