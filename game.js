@@ -505,7 +505,7 @@ class PixelSceneRenderer {
     this.locomotion.receiveTimer = 0;
   }
 
-  render(currentCustomer) {
+  render(currentCustomer, catCfg, catState) {
     this.tick++;
     const ctx = this.ctx;
 
@@ -531,13 +531,147 @@ class PixelSceneRenderer {
       this.renderHoiAnLanterns(ctx);
     }
 
-    // 3. Render Animated Walking / Idle Customer Sprite (Agent Sprite Forge Engine)
+    // 3. Render Miu Miu Cat (Procedural Tabby Cat or Baked Emote)
+    if (catCfg) {
+      if (!catCfg.baked) {
+        this.drawCat(ctx, catCfg, catState);
+      } else if (catState === 'happy') {
+        this.drawBakedCatHappyHeart(ctx, catCfg);
+      }
+    }
+
+    // 4. Render Animated Walking / Idle Customer Sprite (Agent Sprite Forge Engine)
     if (currentCustomer) {
       this.updateAndRenderCustomer(ctx, currentCustomer);
     }
 
-    // 4. Ambient Coffee Steam Animation
+    // 5. Ambient Coffee Steam Animation
     this.renderCoffeeSteam(ctx);
+  }
+
+  // --- PROCEDURAL PIXEL CAT (MÈO CAM TABBY) ---
+  drawCat(ctx, catCfg, state = 'sleep') {
+    if (!catCfg) return;
+    const x = catCfg.x;
+    let y = catCfg.y;
+    const bounce = (state === 'happy') ? -6 : 0;
+    y += bounce;
+
+    ctx.save();
+    // Drop shadow under cat
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.beginPath();
+    ctx.ellipse(x + 18, catCfg.y + 22, 18, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Breathing / idle motion
+    const breath = (state === 'sleep') ? Math.sin(this.tick * 0.05) * 1 : 0;
+
+    // Body (warm ginger orange)
+    ctx.fillStyle = '#ea580c';
+    ctx.fillRect(x + 4, y + 8 - breath, 24, 14 + breath);
+    ctx.fillStyle = '#f97316';
+    ctx.fillRect(x + 6, y + 9 - breath, 20, 11 + breath);
+
+    // Tabby stripes
+    ctx.fillStyle = '#9a3412';
+    ctx.fillRect(x + 10, y + 8 - breath, 2, 7);
+    ctx.fillRect(x + 15, y + 8 - breath, 2, 8);
+    ctx.fillRect(x + 20, y + 8 - breath, 2, 7);
+
+    // Cream white belly / chest
+    ctx.fillStyle = '#ffedd5';
+    ctx.fillRect(x + 8, y + 17, 16, 5);
+
+    // Head
+    const headY = (state === 'sleep') ? y + 9 : y + 4;
+    ctx.fillStyle = '#ea580c';
+    ctx.fillRect(x + 22, headY, 14, 12);
+    ctx.fillStyle = '#f97316';
+    ctx.fillRect(x + 23, headY + 1, 12, 10);
+
+    // Ears
+    ctx.fillStyle = '#c2410c';
+    ctx.fillRect(x + 23, headY - 4, 4, 4);
+    ctx.fillRect(x + 31, headY - 4, 4, 4);
+    // Inner ear pink
+    ctx.fillStyle = '#f472b6';
+    ctx.fillRect(x + 24, headY - 3, 2, 3);
+    ctx.fillRect(x + 32, headY - 3, 2, 3);
+
+    // Face / Eyes
+    if (state === 'sleep') {
+      // Sleeping eyes (cute curved lines)
+      ctx.fillStyle = '#7c2d12';
+      ctx.fillRect(x + 26, headY + 5, 3, 1);
+      ctx.fillRect(x + 31, headY + 5, 3, 1);
+      // Small Zzz floating periodically
+      if (Math.sin(this.tick * 0.04) > 0.35) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+        ctx.font = '8px "VT323", monospace';
+        ctx.fillText('z', x + 35, headY - 2);
+      }
+    } else {
+      // Awake / Happy eyes
+      if (state === 'happy') {
+        // Happy squinting eye arcs (^ ^)
+        ctx.fillStyle = '#7c2d12';
+        ctx.fillRect(x + 26, headY + 4, 3, 2);
+        ctx.fillRect(x + 31, headY + 4, 3, 2);
+        ctx.fillStyle = '#ea580c';
+        ctx.fillRect(x + 26, headY + 5, 3, 1);
+        ctx.fillRect(x + 31, headY + 5, 3, 1);
+      } else {
+        // Wide awake round eyes
+        ctx.fillStyle = '#16a34a'; // emerald green
+        ctx.fillRect(x + 26, headY + 4, 3, 3);
+        ctx.fillRect(x + 31, headY + 4, 3, 3);
+        ctx.fillStyle = '#0f172a'; // black pupil
+        ctx.fillRect(x + 27, headY + 4, 1, 3);
+        ctx.fillRect(x + 32, headY + 4, 1, 3);
+      }
+    }
+
+    // Nose
+    ctx.fillStyle = '#f472b6';
+    ctx.fillRect(x + 29, headY + 7, 2, 1);
+
+    // Whiskers
+    ctx.fillStyle = '#fed7aa';
+    ctx.fillRect(x + 23, headY + 7, 2, 1);
+    ctx.fillRect(x + 35, headY + 7, 2, 1);
+
+    // Paws (front paws folded)
+    ctx.fillStyle = '#ffedd5';
+    ctx.fillRect(x + 21, y + 19, 4, 3);
+    ctx.fillRect(x + 26, y + 19, 4, 3);
+
+    // Tail (animated flicking when awake, curled when sleeping)
+    ctx.fillStyle = '#ea580c';
+    if (state === 'sleep') {
+      ctx.fillRect(x, y + 14, 5, 7);
+      ctx.fillRect(x + 3, y + 18, 5, 3);
+    } else {
+      const tailWiggle = Math.sin(this.tick * 0.12) * 3;
+      ctx.fillRect(x - 2 + tailWiggle, y + 7, 4, 12);
+      ctx.fillStyle = '#c2410c';
+      ctx.fillRect(x - 3 + tailWiggle, y + 5, 4, 4);
+    }
+
+    // If happy, draw floating heart 💖 above head
+    if (state === 'happy') {
+      ctx.font = '12px sans-serif';
+      ctx.fillText('💖', x + 16, y - 4);
+    }
+
+    ctx.restore();
+  }
+
+  drawBakedCatHappyHeart(ctx, catCfg) {
+    ctx.save();
+    ctx.font = '14px sans-serif';
+    ctx.fillText('💖', catCfg.x + 38, catCfg.y - 4);
+    ctx.restore();
   }
 
   updateAndRenderCustomer(ctx, customer) {
@@ -751,6 +885,7 @@ const SCENE_CONFIGS = {
     name: '🌧️ Đêm Mưa Vỉa Hè (Phố Khuya)',
     targetX: 155,
     targetY: 175,
+    cat: { baked: true, x: 500, y: 275, w: 90, h: 45 },
     customer: {
       id: 'vinh-driver',
       spriteKey: 'vinh',
@@ -788,6 +923,7 @@ const SCENE_CONFIGS = {
     name: '☕ Quầy Bar Gỗ Cổ Điển (Ấm Cúng)',
     targetX: 195,
     targetY: 172,
+    cat: { baked: false, x: 510, y: 285, w: 38, h: 26 },
     customer: {
       id: 'hoa-student',
       spriteKey: 'hoa',
@@ -825,6 +961,7 @@ const SCENE_CONFIGS = {
     name: '🏬 Quán Phố Hiện Đại (Rộn Ràng)',
     targetX: 345,
     targetY: 168,
+    cat: { baked: false, x: 485, y: 290, w: 38, h: 26 },
     customer: {
       id: 'lam-dev',
       spriteKey: 'lam',
@@ -861,6 +998,7 @@ const SCENE_CONFIGS = {
     name: '☀️ Sáng Sớm Phố Cổ (Cà Phê Sáng)',
     targetX: 140,
     targetY: 205,
+    cat: { baked: false, x: 435, y: 285, w: 38, h: 26 },
     customer: {
       id: 'ba-elder',
       spriteKey: 'owner',
@@ -896,6 +1034,7 @@ const SCENE_CONFIGS = {
     name: '🏮 Hoàng Hôn Bờ Sông Hội An (Bờ Sông Hoài)',
     targetX: 330,
     targetY: 195,
+    cat: { baked: false, x: 465, y: 280, w: 38, h: 26 },
     customer: {
       id: 'lan-merchant',
       spriteKey: 'hoa',
@@ -985,6 +1124,8 @@ class GameController {
     this.currentThemeKey = 'night';
     this.coins = 0;
     this.hearts = 0;
+    this.catState = 'sleep';
+    this.catHappyTimer = null;
 
     // Upgrades Inventory
     this.upgrades = {
@@ -1114,12 +1255,14 @@ class GameController {
       }
     });
 
-    // Canvas click: check if clicked on cat in night scene
+    // Canvas click: check if clicked on cat in current scene with 4px padding
     this.canvas.addEventListener('click', (e) => {
       const rect = this.canvas.getBoundingClientRect();
       const x = (e.clientX - rect.left) * (this.canvas.width / rect.width);
       const y = (e.clientY - rect.top) * (this.canvas.height / rect.height);
-      if (this.renderer.theme === 'night' && x > 440 && x < 560 && y > 250 && y < 340) {
+      const sceneCfg = SCENE_CONFIGS[this.currentThemeKey];
+      const cat = sceneCfg && sceneCfg.cat;
+      if (cat && x >= cat.x - 4 && x <= cat.x + cat.w + 4 && y >= cat.y - 4 && y <= cat.y + cat.h + 4) {
         this.petCat(e);
       }
     });
@@ -1148,6 +1291,12 @@ class GameController {
     document.getElementById('speaker-name').textContent = customer.name;
     document.getElementById('order-badge').innerHTML = `Yêu cầu: <strong>${customer.requiredDrink}</strong> + ${customer.foodSnack}`;
     document.getElementById('customer-emotion').textContent = 'Trạng thái: ⏳ Đang đợi nước & đồ ăn...';
+
+    // Show/hide Pet Cat button based on cat availability in scene
+    const btnCat = document.getElementById('btn-quick-pet-cat');
+    if (btnCat) {
+      btnCat.style.display = sceneCfg.cat ? 'flex' : 'none';
+    }
 
     // Typewriter dialogue (cốt truyện theo cờ)
     const arrival = this.story.getArrival(themeKey, customer.dialogue);
@@ -1522,15 +1671,24 @@ class GameController {
 
   // --- PET CAT FEATURE ---
   petCat(e) {
-    this.sound.playMeowSound();
-    this.hearts += 1;
-    document.getElementById('heart-count').textContent = this.hearts;
+    this.catState = 'happy';
+    clearTimeout(this.catHappyTimer);
+    this.catHappyTimer = setTimeout(() => {
+      this.catState = 'sleep';
+    }, 800);
 
+    this.sound.playMeowSound();
     const x = e ? e.clientX : window.innerWidth / 2;
     const y = e ? e.clientY : window.innerHeight / 2;
-    this.spawnFloatingHeart(x, y);
 
-    this.showToast('🐾 Miu Miu kêu "Meo meo~" cuộn tròn sung sướng! (+1 💖)');
+    if (this.upgrades.pate_cat) {
+      this.hearts += 1;
+      document.getElementById('heart-count').textContent = this.hearts;
+      this.spawnFloatingHeart(x, y);
+      this.showToast('🐾 Miu Miu kêu "Meo meo~" cuộn tròn sung sướng! (+1 💖)');
+    } else {
+      this.showToast('🐾 Miu Miu kêu "Meo meo~" dụi đầu vào tay bạn! (💡 Mua "Pate Thơm" trong Tiệm Nâng Cấp để mèo no nê và thưởng tim liên tục!)');
+    }
   }
 
   spawnFloatingHeart(x, y) {
@@ -1839,7 +1997,7 @@ class GameController {
   startLoop() {
     const loop = () => {
       const sceneCfg = SCENE_CONFIGS[this.currentThemeKey];
-      this.renderer.render(sceneCfg.customer);
+      this.renderer.render(sceneCfg.customer, sceneCfg.cat, this.catState);
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
