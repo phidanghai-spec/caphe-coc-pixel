@@ -420,12 +420,21 @@ class PixelSceneRenderer {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
+    this.ctx.imageSmoothingEnabled = false;
     this.width = canvas.width;
     this.height = canvas.height;
     this.tick = 0;
+    this.simTime = 0;
 
     // Current Theme: 'night', 'counter', 'indoor', 'morning', 'hoian'
     this.theme = 'night';
+
+    // Offscreen 640x360 Background Cache (Pre-scaled once, avoids downscaling 1376x768 each frame)
+    this.bgCache = document.createElement('canvas');
+    this.bgCache.width = this.width;
+    this.bgCache.height = this.height;
+    this.bgCacheCtx = this.bgCache.getContext('2d');
+    this.bgCacheCtx.imageSmoothingEnabled = false;
 
     // Preload Background Images
     this.bgImages = {
@@ -435,11 +444,19 @@ class PixelSceneRenderer {
       morning: new Image(),
       hoian: new Image()
     };
+    Object.keys(this.bgImages).forEach((key) => {
+      this.bgImages[key].onload = () => {
+        if (this.theme === key) {
+          this.updateBgCache(key);
+        }
+      };
+    });
     this.bgImages.night.src = 'assets/cafe_night_v2_bg.jpg';
     this.bgImages.counter.src = 'assets/cafe_counter_bg.jpg';
     this.bgImages.indoor.src = 'assets/cafe_indoor_v2_bg.jpg';
     this.bgImages.morning.src = 'assets/cafe_morning_v2_bg.jpg';
     this.bgImages.hoian.src = 'assets/cafe_hoian_v2_bg.jpg';
+    this.updateBgCache(this.theme);
 
     // Preload Character Sprites
     this.sprites = {
@@ -474,6 +491,7 @@ class PixelSceneRenderer {
       y: 175,
       targetX: 160,
       walkStep: 0,
+      walkPhase: 0,
       facing: 1, // 1: facing right, -1: left
       hasDrink: false,
       drinkEmoji: '☕',
@@ -482,8 +500,23 @@ class PixelSceneRenderer {
     };
   }
 
+  updateBgCache(theme = this.theme) {
+    if (!this.bgCacheCtx) return;
+    const bgImg = this.bgImages[theme];
+    const bCtx = this.bgCacheCtx;
+    bCtx.imageSmoothingEnabled = false;
+    bCtx.clearRect(0, 0, this.width, this.height);
+    if (bgImg && bgImg.complete && bgImg.naturalWidth > 0) {
+      bCtx.drawImage(bgImg, 0, 0, this.width, this.height);
+    } else {
+      bCtx.fillStyle = (theme === 'morning') ? '#7dd3fc' : '#0f172a';
+      bCtx.fillRect(0, 0, this.width, this.height);
+    }
+  }
+
   setTheme(theme, targetX, targetY) {
     this.theme = theme;
+    this.updateBgCache(theme);
     this.resetCustomerLocomotion(targetX || 160, targetY || 175);
   }
 
@@ -493,6 +526,7 @@ class PixelSceneRenderer {
     this.locomotion.y = targetY;
     this.locomotion.targetX = targetX;
     this.locomotion.walkStep = 0;
+    this.locomotion.walkPhase = 0;
     this.locomotion.facing = 1;
     this.locomotion.hasDrink = false;
     this.locomotion.receiveTimer = 0;
@@ -506,17 +540,10 @@ class PixelSceneRenderer {
   }
 
   render(currentCustomer, catCfg, catState) {
-    this.tick++;
     const ctx = this.ctx;
 
-    // 1. Draw High-Quality Pixel Art Background
-    const bgImg = this.bgImages[this.theme];
-    if (bgImg.complete && bgImg.naturalWidth > 0) {
-      ctx.drawImage(bgImg, 0, 0, this.width, this.height);
-    } else {
-      ctx.fillStyle = this.theme === 'morning' ? '#7dd3fc' : '#0f172a';
-      ctx.fillRect(0, 0, this.width, this.height);
-    }
+    // 1. Draw High-Quality Pixel Art Background (from pre-scaled 640x360 offscreen cache)
+    ctx.drawImage(this.bgCache, 0, 0);
 
     // 2. Animate Weather / Lighting Effects
     if (this.theme === 'night') {
@@ -674,47 +701,99 @@ class PixelSceneRenderer {
     ctx.restore();
   }
 
-  updateAndRenderCustomer(ctx, customer) {
-    const loc = this.locomotion;
-    const spriteKey = customer.spriteKey || 'vinh';
-    const spriteImg = this.sprites[spriteKey];
+  updateLogic(dt = 1 / 60) {
+    this.simTime += dt;
+    this.tick++;
 
-    // Locomotion State Updates
-    let bob = 0;
-    let tilt = 0;
+    const loc = this.locomotion;
+    const stride = 8.2; // px per walkPhase radian
 
     if (loc.phase === 'walk_in') {
-      loc.x += 1.8;
+      const speed = 108; // px / sec
+      const dx = speed * dt;
+      loc.x += dx;
+      loc.walkPhase += Math.abs(dx) / stride;
       loc.walkStep++;
-      const stepAngle = loc.walkStep * 0.22;
-      bob = Math.abs(Math.sin(stepAngle)) * 5.5;
-      tilt = Math.sin(stepAngle) * 0.04;
       if (loc.x >= loc.targetX) {
         loc.x = loc.targetX;
         loc.phase = 'idle';
       }
-    } else if (loc.phase === 'idle') {
-      bob = Math.sin(this.tick * 0.06) * 1.8;
-      tilt = 0;
     } else if (loc.phase === 'receive') {
-      loc.receiveTimer++;
-      bob = Math.sin(loc.receiveTimer * 0.25) * 6; // happy bounce
-      if (loc.receiveTimer > 80) {
+      loc.receiveTimer += dt;
+      if (loc.receiveTimer >= 1.33) {
         loc.phase = 'walk_out';
+        loc.walkPhase = 0;
         loc.walkStep = 0;
       }
     } else if (loc.phase === 'walk_out') {
-      loc.x += 2.0;
+      const speed = 120; // px / sec
+      const dx = speed * dt;
+      loc.x += dx;
+      loc.walkPhase += Math.abs(dx) / stride;
       loc.walkStep++;
-      const stepAngle = loc.walkStep * 0.22;
-      bob = Math.abs(Math.sin(stepAngle)) * 5.5;
-      tilt = Math.sin(stepAngle) * 0.04;
       if (loc.x > this.width + 60) {
         loc.phase = 'completed';
         if (loc.onDepartCallback) {
           loc.onDepartCallback();
         }
       }
+    }
+
+    if (this.theme === 'night') {
+      this.updateRain(dt);
+    }
+  }
+
+  updateRain(dt = 1 / 60) {
+    const rate = dt * 60;
+    this.raindrops.forEach((drop) => {
+      drop.y += drop.speed * rate;
+      drop.x -= 0.8 * rate;
+      if (drop.y > this.height) {
+        drop.y = -10;
+        drop.x = Math.random() * (this.width + 50);
+
+        if (Math.random() > 0.65) {
+          this.ripples.push({
+            x: drop.x,
+            y: 220 + Math.random() * 120,
+            radius: 1,
+            maxRadius: 10 + Math.random() * 6,
+            alpha: 0.6
+          });
+        }
+      }
+    });
+
+    for (let r = this.ripples.length - 1; r >= 0; r--) {
+      const rip = this.ripples[r];
+      rip.radius += 0.5 * rate;
+      rip.alpha -= 0.025 * rate;
+      if (rip.alpha <= 0) {
+        this.ripples.splice(r, 1);
+      }
+    }
+  }
+
+  updateAndRenderCustomer(ctx, customer) {
+    const loc = this.locomotion;
+    const spriteKey = customer.spriteKey || 'vinh';
+    const spriteImg = this.sprites[spriteKey];
+
+    // Locomotion Visual Offsets (Distance-locked walkPhase, time-locked idle/receive)
+    let bob = 0;
+    let tilt = 0;
+
+    if (loc.phase === 'walk_in' || loc.phase === 'walk_out') {
+      const stepAngle = loc.walkPhase;
+      bob = Math.abs(Math.sin(stepAngle)) * 5.5;
+      tilt = Math.sin(stepAngle) * 0.04;
+    } else if (loc.phase === 'idle') {
+      bob = Math.sin(this.simTime * 3.6) * 1.8;
+      tilt = 0;
+    } else if (loc.phase === 'receive') {
+      bob = Math.sin(loc.receiveTimer * 15) * 6; // happy bounce
+      tilt = 0;
     }
 
     if (!spriteImg || !spriteImg.complete || spriteImg.naturalWidth <= 0) return;
@@ -726,7 +805,9 @@ class PixelSceneRenderer {
 
     ctx.save();
     // 1. Drop shadow under character feet (stretches with walk)
-    const shadowScale = loc.phase === 'walk_in' || loc.phase === 'walk_out' ? (1 + Math.sin(loc.walkStep * 0.22) * 0.2) : 1;
+    const shadowScale = (loc.phase === 'walk_in' || loc.phase === 'walk_out')
+      ? (1 + Math.sin(loc.walkPhase) * 0.2)
+      : 1;
     ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
     ctx.beginPath();
     ctx.ellipse(cx + cw / 2, loc.y + ch - 4, 20 * shadowScale, 5, 0, 0, Math.PI * 2);
@@ -749,7 +830,7 @@ class PixelSceneRenderer {
     // 4. Happy expression hearts when receiving drink
     if (loc.phase === 'receive') {
       ctx.font = '16px serif';
-      ctx.fillText('💖', -15 + Math.sin(this.tick * 0.1) * 6, -ch / 2 - 12);
+      ctx.fillText('💖', -15 + Math.sin(this.simTime * 6) * 6, -ch / 2 - 12);
       ctx.fillText('✨', 12, -ch / 2 - 18);
     }
 
@@ -764,37 +845,14 @@ class PixelSceneRenderer {
       ctx.moveTo(drop.x, drop.y);
       ctx.lineTo(drop.x - 2, drop.y + drop.len);
       ctx.stroke();
-
-      drop.y += drop.speed;
-      drop.x -= 0.8;
-      if (drop.y > this.height) {
-        drop.y = -10;
-        drop.x = Math.random() * (this.width + 50);
-
-        if (Math.random() > 0.65) {
-          this.ripples.push({
-            x: drop.x,
-            y: 220 + Math.random() * 120,
-            radius: 1,
-            maxRadius: 10 + Math.random() * 6,
-            alpha: 0.6
-          });
-        }
-      }
     });
 
-    for (let r = this.ripples.length - 1; r >= 0; r--) {
+    for (let r = 0; r < this.ripples.length; r++) {
       const rip = this.ripples[r];
       ctx.strokeStyle = `rgba(186, 230, 253, ${rip.alpha})`;
       ctx.beginPath();
       ctx.ellipse(rip.x, rip.y, rip.radius, rip.radius * 0.35, 0, 0, Math.PI * 2);
       ctx.stroke();
-
-      rip.radius += 0.5;
-      rip.alpha -= 0.025;
-      if (rip.alpha <= 0) {
-        this.ripples.splice(r, 1);
-      }
     }
   }
 
@@ -1995,7 +2053,22 @@ class GameController {
   }
 
   startLoop() {
-    const loop = () => {
+    let lastTime = performance.now();
+    let accumulator = 0;
+    const fixedDt = 1000 / 60; // 16.6667ms fixed logic step
+
+    const loop = (currentTime) => {
+      if (typeof currentTime !== 'number') currentTime = performance.now();
+      let frameTime = currentTime - lastTime;
+      lastTime = currentTime;
+      if (frameTime > 250) frameTime = 250; // Clamp lag spikes
+
+      accumulator += frameTime;
+      while (accumulator >= fixedDt) {
+        this.renderer.updateLogic(fixedDt / 1000);
+        accumulator -= fixedDt;
+      }
+
       const sceneCfg = SCENE_CONFIGS[this.currentThemeKey];
       this.renderer.render(sceneCfg.customer, sceneCfg.cat, this.catState);
       requestAnimationFrame(loop);

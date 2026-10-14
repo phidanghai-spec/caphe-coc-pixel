@@ -229,14 +229,37 @@ body {
   position: absolute;
   top: 12px;
   left: 14px;
-  background: rgba(15, 23, 42, 0.88);
-  backdrop-filter: blur(8px);
+  background: rgba(15, 23, 42, 0.94);
   padding: 5px 12px;
   border-radius: 20px;
   font-size: 0.75rem;
   color: var(--accent-neon);
   border: 1px solid rgba(56, 189, 248, 0.35);
   font-family: var(--pixel-font);
+  z-index: 10;
+}
+
+.btn-canvas-cat {
+  position: absolute;
+  bottom: 12px;
+  right: 14px;
+  background: rgba(15, 23, 42, 0.94);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  color: var(--accent-warm);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-family: var(--pixel-font);
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  transition: transform 0.15s ease, background 0.15s ease;
+  z-index: 10;
+}
+
+.btn-canvas-cat:hover {
+  transform: translateY(-2px);
+  background: rgba(245, 158, 11, 0.22);
+  border-color: #fde047;
 }
 
 /* RPG Dialogue Box with Sprite Portrait */
@@ -389,6 +412,7 @@ body {
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.25s ease, transform 0.25s ease;
+  will-change: transform;
   z-index: 35;
 }
 
@@ -463,7 +487,9 @@ body {
 .stream-milk {
   top: 50px;
   left: 92px;
-  height: 0px;
+  height: 70px;
+  transform-origin: top center;
+  transform: scaleY(0);
   background: linear-gradient(180deg, #fef08a 0%, #ffffff 100%);
   box-shadow: 0 0 6px rgba(254, 240, 138, 0.8);
 }
@@ -519,7 +545,9 @@ body {
 .stream-coffee {
   top: 48px;
   left: -4px;
-  height: 0px;
+  height: 75px;
+  transform-origin: top center;
+  transform: scaleY(0);
   background: linear-gradient(180deg, #3b1703 0%, #270e02 100%);
   box-shadow: 0 0 6px rgba(59, 23, 3, 0.8);
 }
@@ -732,6 +760,7 @@ body {
     inset 2px 0 6px rgba(255, 255, 255, 0.25),
     inset -2px 0 6px rgba(255, 255, 255, 0.25);
   transition: transform 0.4s ease;
+  will-change: transform;
 }
 
 .liquid-vortex {
@@ -765,10 +794,10 @@ body {
 }
 
 @keyframes streamMilkFlow {
-  0% { height: 0px; opacity: 1; }
-  15% { height: 70px; opacity: 1; }
-  85% { height: 70px; opacity: 1; }
-  100% { height: 0px; opacity: 0; }
+  0% { transform: scaleY(0); opacity: 1; }
+  15% { transform: scaleY(1); opacity: 1; }
+  85% { transform: scaleY(1); opacity: 1; }
+  100% { transform: scaleY(0); opacity: 0; }
 }
 
 @keyframes pourCoffeeAction {
@@ -780,10 +809,10 @@ body {
 }
 
 @keyframes streamCoffeeFlow {
-  0% { height: 0px; opacity: 1; }
-  15% { height: 75px; opacity: 1; }
-  85% { height: 75px; opacity: 1; }
-  100% { height: 0px; opacity: 0; }
+  0% { transform: scaleY(0); opacity: 1; }
+  15% { transform: scaleY(1); opacity: 1; }
+  85% { transform: scaleY(1); opacity: 1; }
+  100% { transform: scaleY(0); opacity: 0; }
 }
 
 @keyframes dropIceTongsAction {
