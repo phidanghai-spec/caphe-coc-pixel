@@ -414,8 +414,302 @@ class SoundEngine {
   }
 }
 
-// --- 2. ADVANCED PIXEL SCENE RENDERER (SPRITES & THEMES) ---
-// --- 2. ADVANCED PIXEL SCENE RENDERER (AGENT SPRITE FORGE WALK ENGINE) ---
+// --- 2. AGENT SPRITE FORGE: SPRITE ATLAS LOADER & CLIP PLAYER ---
+
+/**
+ * Loads an Aseprite JSON atlas & engine export for a given character spriteKey.
+ * Structure expected:
+ *   assets/sprites/<key>/aseprite/<name>.json
+ *   assets/sprites/<key>/aseprite/<name>.png
+ *   assets/sprites/<key>/engine-export.json
+ * Returns Promise<{clips, image, anchor, frameW, frameH, engineExport}> or null on missing files.
+ */
+async function loadSpriteAtlas(key) {
+  try {
+    // 1. Fetch engine-export.json (optional, prioritized for anchor_px)
+    let engineExport = null;
+    try {
+      const eeRes = await fetch(`assets/sprites/${key}/engine-export.json`);
+      if (eeRes.ok) {
+        engineExport = await eeRes.json();
+      }
+    } catch (_) {}
+
+    // 2. Fetch Aseprite JSON: try key.json first
+    let aseData = null;
+    let jsonName = key;
+    try {
+      const res = await fetch(`assets/sprites/${key}/aseprite/${jsonName}.json`);
+      if (res.ok) {
+        aseData = await res.json();
+      }
+    } catch (_) {}
+
+    if (!aseData) {
+      // Fallback filename checks
+      for (const fallbackName of ['animation', 'atlas', 'spritesheet']) {
+        try {
+          const res = await fetch(`assets/sprites/${key}/aseprite/${fallbackName}.json`);
+          if (res.ok) {
+            aseData = await res.json();
+            jsonName = fallbackName;
+            break;
+          }
+        } catch (_) {}
+      }
+    }
+
+    if (!aseData || !aseData.frames) {
+      return null; // Missing atlas file, fallback gracefully
+    }
+
+    // 3. Load PNG sprite sheet image
+    const imageName = (aseData.meta && aseData.meta.image) ? aseData.meta.image : `${jsonName}.png`;
+    const imagePath = `assets/sprites/${key}/aseprite/${imageName}`;
+    const img = await new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error(`Failed to load ${imagePath}`));
+      image.src = imagePath;
+    });
+
+    // 4. Frames & dimensions parsing
+    const framesMap = {};
+    if (Array.isArray(aseData.frames)) {
+      aseData.frames.forEach((f, idx) => {
+        framesMap[String(idx)] = f;
+      });
+    } else {
+      Object.assign(framesMap, aseData.frames);
+    }
+
+    const firstKey = Object.keys(framesMap)[0];
+    const firstFrame = framesMap[firstKey] ? framesMap[firstKey].frame : { w: 60, h: 108 };
+    const frameW = firstFrame.w;
+    const frameH = firstFrame.h;
+
+    // Anchor: priority: engine-export.json mapping.anchor_px -> slices anchor -> default bottom-center
+    let anchor = null;
+    if (engineExport && engineExport.mapping && Array.isArray(engineExport.mapping.anchor_px)) {
+      anchor = { x: engineExport.mapping.anchor_px[0], y: engineExport.mapping.anchor_px[1] };
+    } else if (aseData.meta && Array.isArray(aseData.meta.slices)) {
+      const anchorSlice = aseData.meta.slices.find(s => s.name === 'anchor');
+      if (anchorSlice && anchorSlice.keys && anchorSlice.keys[0]) {
+        const k0 = anchorSlice.keys[0];
+        if (k0.pivot) {
+          anchor = { x: k0.pivot.x, y: k0.pivot.y };
+        } else if (k0.bounds) {
+          anchor = { x: k0.bounds.x, y: k0.bounds.y };
+        }
+      }
+    }
+    if (!anchor) {
+      anchor = { x: Math.round(frameW / 2), y: frameH };
+    }
+
+    // 5. Parse Clips from frameTags or animations
+    const clips = {};
+
+    if (aseData.meta && Array.isArray(aseData.meta.frameTags)) {
+      aseData.meta.frameTags.forEach(tag => {
+        const tagFrames = [];
+        let totalDuration = 0;
+        const fromIdx = typeof tag.from === 'number' ? tag.from : parseInt(tag.from, 10);
+        const toIdx = typeof tag.to === 'number' ? tag.to : parseInt(tag.to, 10);
+
+        for (let i = fromIdx; i <= toIdx; i++) {
+          const fData = framesMap[String(i)] || framesMap[i];
+          if (fData) {
+            const dur = fData.duration || 100;
+            tagFrames.push({
+              index: i,
+              frame: fData.frame,
+              duration: dur
+            });
+            totalDuration += dur;
+          }
+        }
+
+        clips[tag.name] = {
+          name: tag.name,
+          frames: tagFrames,
+          totalDuration: Math.max(totalDuration, 1),
+          repeat: tag.repeat
+        };
+      });
+    }
+
+    if (aseData.animations) {
+      Object.keys(aseData.animations).forEach(animName => {
+        if (!clips[animName]) {
+          const animIndices = aseData.animations[animName];
+          const animFrames = [];
+          let totalDuration = 0;
+          animIndices.forEach(idxStr => {
+            const fData = framesMap[String(idxStr)];
+            if (fData) {
+              const dur = fData.duration || 100;
+              animFrames.push({
+                index: parseInt(idxStr, 10),
+                frame: fData.frame,
+                duration: dur
+              });
+              totalDuration += dur;
+            }
+          });
+          clips[animName] = {
+            name: animName,
+            frames: animFrames,
+            totalDuration: Math.max(totalDuration, 1),
+            repeat: null
+          };
+        }
+      });
+    }
+
+    return {
+      key,
+      clips,
+      image: img,
+      anchor,
+      frameW,
+      frameH,
+      engineExport
+    };
+  } catch (err) {
+    return null;
+  }
+}
+
+/**
+ * Time-based and Distance-based Sprite Clip Animation Player
+ */
+class SpriteClipPlayer {
+  constructor(atlas = null) {
+    this.atlas = atlas;
+    this.currentClipName = null;
+    this.currentClip = null;
+    this.mode = 'loop'; // 'loop' | 'once' | 'hold'
+    this.elapsedMs = 0;
+    this.isDone = false;
+    this.currentFrame = null;
+    this.onDoneCallback = null;
+
+    if (atlas) this.setAtlas(atlas);
+  }
+
+  setAtlas(atlas) {
+    this.atlas = atlas;
+    if (this.currentClipName && atlas && atlas.clips && atlas.clips[this.currentClipName]) {
+      this.currentClip = atlas.clips[this.currentClipName];
+    }
+  }
+
+  hasClip(clipName) {
+    return !!(this.atlas && this.atlas.clips && this.atlas.clips[clipName]);
+  }
+
+  play(clipName, options = {}) {
+    const mode = options.mode || 'loop';
+    const onDone = options.onDone || null;
+
+    if (this.currentClipName === clipName && this.mode === mode && !this.isDone) {
+      if (onDone) this.onDoneCallback = onDone;
+      return;
+    }
+
+    this.currentClipName = clipName;
+    this.mode = mode;
+    this.elapsedMs = 0;
+    this.isDone = false;
+    this.onDoneCallback = onDone;
+
+    if (this.atlas && this.atlas.clips && this.atlas.clips[clipName]) {
+      this.currentClip = this.atlas.clips[clipName];
+      this.currentFrame = (this.currentClip && this.currentClip.frames && this.currentClip.frames.length > 0)
+        ? this.currentClip.frames[0]
+        : null;
+    } else {
+      this.currentClip = null;
+      this.currentFrame = null;
+    }
+  }
+
+  update(dtMs, walkPhase = 0) {
+    if (!this.currentClip || !this.currentClip.frames || this.currentClip.frames.length === 0) {
+      this.currentFrame = null;
+      return;
+    }
+
+    const frames = this.currentClip.frames;
+    const totalDuration = this.currentClip.totalDuration;
+
+    // Distance-locked walking clip: frame depends on walkPhase, not real-time
+    if (this.currentClipName === 'walk') {
+      const normalizedPhase = ((walkPhase % 1) + 1) % 1;
+      const targetTimeMs = normalizedPhase * totalDuration;
+      let acc = 0;
+      for (let i = 0; i < frames.length; i++) {
+        acc += frames[i].duration;
+        if (targetTimeMs < acc || i === frames.length - 1) {
+          this.currentFrame = frames[i];
+          break;
+        }
+      }
+      return;
+    }
+
+    // Standard simulation-time animation
+    if (!this.isDone) {
+      this.elapsedMs += dtMs;
+    }
+
+    if (this.mode === 'loop') {
+      const timeInLoop = this.elapsedMs % totalDuration;
+      let acc = 0;
+      for (let i = 0; i < frames.length; i++) {
+        acc += frames[i].duration;
+        if (timeInLoop < acc || i === frames.length - 1) {
+          this.currentFrame = frames[i];
+          break;
+        }
+      }
+    } else if (this.mode === 'once' || this.mode === 'hold') {
+      if (this.elapsedMs >= totalDuration) {
+        this.currentFrame = frames[frames.length - 1];
+        if (!this.isDone) {
+          this.isDone = true;
+          if (this.onDoneCallback) {
+            const cb = this.onDoneCallback;
+            this.onDoneCallback = null;
+            cb();
+          }
+        }
+      } else {
+        let acc = 0;
+        for (let i = 0; i < frames.length; i++) {
+          acc += frames[i].duration;
+          if (this.elapsedMs < acc || i === frames.length - 1) {
+            this.currentFrame = frames[i];
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  done() {
+    return this.isDone;
+  }
+}
+
+// Expose globally for testing/debugging
+if (typeof window !== 'undefined') {
+  window.loadSpriteAtlas = loadSpriteAtlas;
+  window.SpriteClipPlayer = SpriteClipPlayer;
+}
+
+// --- 3. ADVANCED PIXEL SCENE RENDERER (AGENT SPRITE FORGE ENGINE) ---
 class PixelSceneRenderer {
   constructor(canvas) {
     this.canvas = canvas;
@@ -489,6 +783,12 @@ class PixelSceneRenderer {
     this.mouseDebug = null;
     this.currentSceneCfg = null;
 
+    // Sprite Atlas Cache & Animation Clip Players
+    this.atlasCache = {};
+    this.atlasLoading = {};
+    this.clipPlayers = {};
+    this.loggedFallbacks = new Set();
+
     // Character Locomotion Engine (Agent Sprite Forge State Machine)
     this.locomotion = {
       phase: 'walk_in', // 'walk_in', 'idle', 'seated', 'receive', 'walk_out', 'completed'
@@ -508,6 +808,31 @@ class PixelSceneRenderer {
       receiveTimer: 0,
       onDepartCallback: null
     };
+  }
+
+  getClipPlayer(spriteKey) {
+    if (!spriteKey) return null;
+    if (!this.clipPlayers[spriteKey]) {
+      const atlas = this.atlasCache[spriteKey] || null;
+      this.clipPlayers[spriteKey] = new SpriteClipPlayer(atlas);
+    }
+    return this.clipPlayers[spriteKey];
+  }
+
+  ensureAtlasLoaded(spriteKey) {
+    if (!spriteKey || this.atlasCache[spriteKey] !== undefined) return;
+    if (this.atlasLoading[spriteKey]) return;
+
+    this.atlasLoading[spriteKey] = loadSpriteAtlas(spriteKey).then(atlas => {
+      this.atlasCache[spriteKey] = atlas;
+      delete this.atlasLoading[spriteKey];
+      if (this.clipPlayers[spriteKey]) {
+        this.clipPlayers[spriteKey].setAtlas(atlas);
+      }
+    }).catch(_ => {
+      this.atlasCache[spriteKey] = null;
+      delete this.atlasLoading[spriteKey];
+    });
   }
 
   updateBgCache(theme = this.theme) {
@@ -531,6 +856,9 @@ class PixelSceneRenderer {
       ? sceneCfgOrTargetX
       : (SCENE_CONFIGS[theme] || { targetX: sceneCfgOrTargetX || 160, targetY: targetY || 175 });
     this.currentSceneCfg = sceneCfg;
+    if (sceneCfg && sceneCfg.customer && sceneCfg.customer.spriteKey) {
+      this.ensureAtlasLoaded(sceneCfg.customer.spriteKey);
+    }
     this.resetCustomerLocomotion(sceneCfg);
   }
 
@@ -576,6 +904,8 @@ class PixelSceneRenderer {
     loc.walkPhase = 0;
     loc.hasDrink = false;
     loc.receiveTimer = 0;
+    loc.receiveStage = null;
+    loc.hurry = false;
     loc.onDepartCallback = oldDepartCallback;
 
     this.computeCustomerPositionAlongPath(loc);
@@ -620,10 +950,42 @@ class PixelSceneRenderer {
   }
 
   receiveDrink(emoji) {
-    this.locomotion.phase = 'receive';
-    this.locomotion.hasDrink = true;
-    this.locomotion.drinkEmoji = emoji || '☕';
-    this.locomotion.receiveTimer = 0;
+    const loc = this.locomotion;
+    loc.phase = 'receive';
+    loc.hasDrink = true;
+    loc.drinkEmoji = emoji || '☕';
+    loc.receiveTimer = 0;
+    loc.receiveStage = null;
+
+    const spriteKey = (this.currentSceneCfg && this.currentSceneCfg.customer && this.currentSceneCfg.customer.spriteKey) || 'vinh';
+    const player = this.getClipPlayer(spriteKey);
+    if (player && player.hasClip('jump_cheer')) {
+      loc.receiveStage = 'jump_cheer';
+      player.play('jump_cheer', {
+        mode: 'once',
+        onDone: () => {
+          if (player.hasClip('emote_love')) {
+            loc.receiveStage = 'emote_love';
+            player.play('emote_love', {
+              mode: 'once',
+              onDone: () => {
+                loc.receiveStage = 'done';
+              }
+            });
+          } else {
+            loc.receiveStage = 'done';
+          }
+        }
+      });
+    } else if (player && player.hasClip('emote_love')) {
+      loc.receiveStage = 'emote_love';
+      player.play('emote_love', {
+        mode: 'once',
+        onDone: () => {
+          loc.receiveStage = 'done';
+        }
+      });
+    }
   }
 
   render(currentCustomer, catCfg, catState) {
@@ -801,6 +1163,9 @@ class PixelSceneRenderer {
     const stride = 8.2; // px per walkPhase radian
     const speed = 92; // px / sec
 
+    const spriteKey = (this.currentSceneCfg && this.currentSceneCfg.customer && this.currentSceneCfg.customer.spriteKey) || 'vinh';
+    const player = this.getClipPlayer(spriteKey);
+
     if (loc.phase === 'walk_in') {
       const delta = speed * dt;
       loc.distance += delta;
@@ -813,13 +1178,53 @@ class PixelSceneRenderer {
         loc.pose = isSit ? 'sit' : 'stand';
       }
       this.computeCustomerPositionAlongPath(loc);
+      if (player) {
+        const clipName = loc.hurry ? 'run' : 'walk';
+        player.play(clipName, { mode: 'loop' });
+        player.update(dt * 1000, loc.walkPhase);
+      }
     } else if (loc.phase === 'receive') {
       loc.receiveTimer += dt;
-      if (loc.receiveTimer >= 1.33) {
-        loc.phase = 'walk_out';
-        loc.pose = 'stand'; // stands up to walk out
-        loc.walkPhase = 0;
-        loc.walkStep = 0;
+      const atlas = this.atlasCache[spriteKey];
+      const hasJumpCheer = player && player.hasClip('jump_cheer');
+      const hasEmoteLove = player && player.hasClip('emote_love');
+
+      if (atlas && (hasJumpCheer || hasEmoteLove)) {
+        if (!loc.receiveStage) {
+          loc.receiveStage = hasJumpCheer ? 'jump_cheer' : 'emote_love';
+          player.play(loc.receiveStage, {
+            mode: 'once',
+            onDone: () => {
+              if (loc.receiveStage === 'jump_cheer' && hasEmoteLove) {
+                loc.receiveStage = 'emote_love';
+                player.play('emote_love', {
+                  mode: 'once',
+                  onDone: () => {
+                    loc.receiveStage = 'done';
+                  }
+                });
+              } else {
+                loc.receiveStage = 'done';
+              }
+            }
+          });
+        }
+        player.update(dt * 1000, loc.walkPhase);
+
+        if (loc.receiveStage === 'done' || loc.receiveTimer >= 2.5) {
+          loc.phase = 'walk_out';
+          loc.pose = 'stand';
+          loc.walkPhase = 0;
+          loc.walkStep = 0;
+          loc.receiveStage = null;
+        }
+      } else {
+        if (loc.receiveTimer >= 1.33) {
+          loc.phase = 'walk_out';
+          loc.pose = 'stand';
+          loc.walkPhase = 0;
+          loc.walkStep = 0;
+        }
       }
     } else if (loc.phase === 'walk_out') {
       const delta = speed * dt;
@@ -833,6 +1238,16 @@ class PixelSceneRenderer {
         if (loc.onDepartCallback) {
           loc.onDepartCallback();
         }
+      }
+      if (player) {
+        const clipName = loc.hurry ? 'run' : 'walk';
+        player.play(clipName, { mode: 'loop' });
+        player.update(dt * 1000, loc.walkPhase);
+      }
+    } else if (loc.phase === 'idle' || loc.phase === 'seated') {
+      if (player) {
+        player.play('idle', { mode: 'loop' });
+        player.update(dt * 1000, loc.walkPhase);
       }
     }
 
@@ -872,11 +1287,90 @@ class PixelSceneRenderer {
     }
   }
 
-  updateAndRenderCustomer(ctx, customer) {
-    const loc = this.locomotion;
+  drawSprite(ctx, atlas, frame, loc) {
+    const scaleFactor = loc.scale || 1.0;
+    const frameW = frame.w;
+    const frameH = frame.h;
+
+    // Integer scale selection based on display height threshold (avoids fractional resampling)
+    let intScale = 1;
+    if (frameH > 0) {
+      const ratio = (108 * scaleFactor) / frameH;
+      if (ratio >= 2.5) intScale = 3;
+      else if (ratio >= 1.5) intScale = 2;
+      else intScale = 1;
+    }
+
+    const ax = (atlas.anchor && typeof atlas.anchor.x === 'number') ? atlas.anchor.x : Math.round(frameW / 2);
+    const ay = (atlas.anchor && typeof atlas.anchor.y === 'number') ? atlas.anchor.y : frameH;
+
+    const isSeated = (loc.phase === 'seated' || (loc.phase === 'receive' && loc.pose === 'sit'));
+    let groundY = loc.y;
+    if (isSeated) {
+      groundY += 7 * scaleFactor;
+    }
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+
+    // 1. Drop shadow under character feet (or stool)
+    if (!isSeated) {
+      const shadowScale = (loc.phase === 'walk_in' || loc.phase === 'walk_out')
+        ? (1 + Math.sin(loc.walkPhase) * 0.2)
+        : 1;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+      ctx.beginPath();
+      ctx.ellipse(loc.x, loc.y - (3 * scaleFactor), 20 * scaleFactor * shadowScale, 5 * scaleFactor, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+      ctx.beginPath();
+      ctx.ellipse(loc.x, loc.y - (2 * scaleFactor), 18 * scaleFactor, 5 * scaleFactor, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 2. Position with Anchor and Flip horizontally around Anchor when facing === -1
+    ctx.translate(Math.round(loc.x), Math.round(groundY));
+    if (loc.facing === -1) {
+      ctx.scale(-1, 1);
+    }
+
+    const drawW = frameW * intScale;
+    const drawH = frameH * intScale;
+    const dx = -Math.round(ax * intScale);
+    const dy = -Math.round(ay * intScale);
+
+    if (isSeated) {
+      ctx.save();
+      ctx.beginPath();
+      const clipBottomCut = Math.round(18 * scaleFactor);
+      ctx.rect(dx - 4, dy - 4, drawW + 8, drawH - clipBottomCut + 4);
+      ctx.clip();
+      ctx.drawImage(atlas.image, frame.x, frame.y, frameW, frameH, dx, dy, drawW, drawH);
+      ctx.restore();
+    } else {
+      ctx.drawImage(atlas.image, frame.x, frame.y, frameW, frameH, dx, dy, drawW, drawH);
+    }
+
+    // 3. Draw Drink in Hand if customer received drink
+    if (loc.hasDrink) {
+      ctx.font = `${Math.round(20 * scaleFactor)}px serif`;
+      ctx.fillText(loc.drinkEmoji, Math.round(drawW / 2 - (8 * scaleFactor)), -5 * scaleFactor);
+    }
+
+    // 4. Happy expression hearts when receiving drink
+    if (loc.phase === 'receive') {
+      ctx.font = '16px serif';
+      ctx.fillText('💖', -15 + Math.sin(this.simTime * 6) * 6, dy - 12);
+      ctx.fillText('✨', 12, dy - 18);
+    }
+
+    ctx.restore();
+  }
+
+  drawFallbackCustomer(ctx, customer, loc) {
     const spriteKey = customer.spriteKey || 'vinh';
     const spriteImg = this.sprites[spriteKey];
-
     if (!spriteImg || !spriteImg.complete || spriteImg.naturalWidth <= 0) return;
 
     const scale = loc.scale || 1.0;
@@ -885,7 +1379,6 @@ class PixelSceneRenderer {
     const cw = baseW * scale;
     const ch = baseH * scale;
 
-    // Locomotion Visual Offsets (Distance-locked walkPhase, time-locked idle/seated/receive)
     let bob = 0;
     let tilt = 0;
     let seatOffsetY = 0;
@@ -899,11 +1392,11 @@ class PixelSceneRenderer {
       bob = Math.sin(this.simTime * 3.6) * (1.8 * scale);
       tilt = 0;
     } else if (loc.phase === 'seated') {
-      bob = Math.sin(this.simTime * 2.8) * (1.2 * scale); // gentle seated breathing
+      bob = Math.sin(this.simTime * 2.8) * (1.2 * scale);
       tilt = 0;
-      seatOffsetY = 7 * scale; // lowered torso when sitting
+      seatOffsetY = 7 * scale;
     } else if (loc.phase === 'receive') {
-      bob = Math.sin(loc.receiveTimer * 15) * (6 * scale); // happy bounce
+      bob = Math.sin(loc.receiveTimer * 15) * (6 * scale);
       tilt = 0;
       if (loc.pose === 'sit') {
         seatOffsetY = 7 * scale;
@@ -916,8 +1409,9 @@ class PixelSceneRenderer {
     const spriteCenterY = footY - (ch / 2) - bob + seatOffsetY;
 
     ctx.save();
+    ctx.imageSmoothingEnabled = false;
 
-    // 1. Drop shadow under character feet (or stool)
+    // Drop shadow
     if (!isSeated) {
       const shadowScale = (loc.phase === 'walk_in' || loc.phase === 'walk_out')
         ? (1 + Math.sin(loc.walkPhase) * 0.2)
@@ -933,7 +1427,6 @@ class PixelSceneRenderer {
       ctx.fill();
     }
 
-    // 2. Draw Sprite with walk tilt or sitting clip
     ctx.translate(spriteCenterX, spriteCenterY);
     if (loc.facing === -1) {
       ctx.scale(-1, 1);
@@ -941,7 +1434,6 @@ class PixelSceneRenderer {
     ctx.rotate(tilt);
 
     if (isSeated) {
-      // Sitting pose: clip lower legs below chair seat line so customer rests naturally on stool
       ctx.save();
       ctx.beginPath();
       const clipBottomCut = 18 * scale;
@@ -953,13 +1445,13 @@ class PixelSceneRenderer {
       ctx.drawImage(spriteImg, -cw / 2, -ch / 2, cw, ch);
     }
 
-    // 3. Draw Drink in Hand if customer received drink
+    // Draw Drink in Hand if customer received drink
     if (loc.hasDrink) {
       ctx.font = `${Math.round(20 * scale)}px serif`;
       ctx.fillText(loc.drinkEmoji, cw / 2 - (8 * scale), -5 * scale);
     }
 
-    // 4. Happy expression hearts when receiving drink
+    // Happy expression hearts when receiving drink
     if (loc.phase === 'receive') {
       ctx.font = '16px serif';
       ctx.fillText('💖', -15 + Math.sin(this.simTime * 6) * 6, -ch / 2 - 12);
@@ -967,6 +1459,44 @@ class PixelSceneRenderer {
     }
 
     ctx.restore();
+  }
+
+  updateAndRenderCustomer(ctx, customer) {
+    const loc = this.locomotion;
+    const spriteKey = customer.spriteKey || 'vinh';
+    this.ensureAtlasLoaded(spriteKey);
+
+    const atlas = this.atlasCache[spriteKey];
+    const player = this.getClipPlayer(spriteKey);
+
+    let clipName = 'idle';
+    if (loc.phase === 'walk_in' || loc.phase === 'walk_out') {
+      clipName = loc.hurry ? 'run' : 'walk';
+    } else if (loc.phase === 'receive') {
+      clipName = loc.receiveStage || 'jump_cheer';
+    } else {
+      clipName = 'idle';
+    }
+
+    if (atlas && player && player.hasClip(clipName)) {
+      if (player.currentClipName !== clipName) {
+        const mode = (clipName === 'jump_cheer' || clipName === 'emote_love') ? 'once' : 'loop';
+        player.play(clipName, { mode });
+      }
+      if (player.currentFrame) {
+        this.drawSprite(ctx, atlas, player.currentFrame.frame, loc);
+        return;
+      }
+    } else if (atlas && (!player || !player.hasClip(clipName))) {
+      const logKey = `${spriteKey}:${clipName}`;
+      if (!this.loggedFallbacks.has(logKey)) {
+        this.loggedFallbacks.add(logKey);
+        console.info(`[SpriteAtlas] Missing clip "${clipName}" for "${spriteKey}", falling back to idle PNG.`);
+      }
+    }
+
+    // Fallback to existing idle PNG
+    this.drawFallbackCustomer(ctx, customer, loc);
   }
 
   renderDebugOverlay(ctx, sceneCfg) {
