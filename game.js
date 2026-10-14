@@ -484,15 +484,25 @@ class PixelSceneRenderer {
     // Puddle ripples
     this.ripples = [];
 
+    // Debug Mode & Scene Reference
+    this.debugMode = false;
+    this.mouseDebug = null;
+    this.currentSceneCfg = null;
+
     // Character Locomotion Engine (Agent Sprite Forge State Machine)
     this.locomotion = {
-      phase: 'walk_in', // 'walk_in', 'idle', 'receive', 'walk_out'
-      x: -60,
-      y: 175,
-      targetX: 160,
+      phase: 'walk_in', // 'walk_in', 'idle', 'seated', 'receive', 'walk_out', 'completed'
+      pose: 'stand',    // 'stand', 'sit'
+      x: 0,
+      y: 0,
+      scale: 1.0,
+      distance: 0,
+      totalDistance: 0,
+      path: [],
+      segments: [],
+      facing: 1, // 1: facing right, -1: left
       walkStep: 0,
       walkPhase: 0,
-      facing: 1, // 1: facing right, -1: left
       hasDrink: false,
       drinkEmoji: '☕',
       receiveTimer: 0,
@@ -514,22 +524,99 @@ class PixelSceneRenderer {
     }
   }
 
-  setTheme(theme, targetX, targetY) {
+  setTheme(theme, sceneCfgOrTargetX, targetY) {
     this.theme = theme;
     this.updateBgCache(theme);
-    this.resetCustomerLocomotion(targetX || 160, targetY || 175);
+    const sceneCfg = (typeof sceneCfgOrTargetX === 'object' && sceneCfgOrTargetX !== null)
+      ? sceneCfgOrTargetX
+      : (SCENE_CONFIGS[theme] || { targetX: sceneCfgOrTargetX || 160, targetY: targetY || 175 });
+    this.currentSceneCfg = sceneCfg;
+    this.resetCustomerLocomotion(sceneCfg);
   }
 
-  resetCustomerLocomotion(targetX, targetY) {
-    this.locomotion.phase = 'walk_in';
-    this.locomotion.x = -60;
-    this.locomotion.y = targetY;
-    this.locomotion.targetX = targetX;
-    this.locomotion.walkStep = 0;
-    this.locomotion.walkPhase = 0;
-    this.locomotion.facing = 1;
-    this.locomotion.hasDrink = false;
-    this.locomotion.receiveTimer = 0;
+  resetCustomerLocomotion(sceneCfg) {
+    const route = (sceneCfg && sceneCfg.route) ? sceneCfg.route : {
+      entry: { x: -50, y: sceneCfg ? sceneCfg.targetY || 175 : 175, scale: 1.0 },
+      waypoints: [],
+      seat: { x: sceneCfg ? sceneCfg.targetX || 160 : 160, y: sceneCfg ? sceneCfg.targetY || 175 : 175, pose: 'stand' },
+      scaleNear: 1.0
+    };
+
+    const pts = [route.entry, ...(route.waypoints || []), route.seat];
+    const segments = [];
+    let totalDist = 0;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const len = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+      segments.push({
+        from: p1,
+        to: p2,
+        length: len,
+        startDist: totalDist,
+        endDist: totalDist + len
+      });
+      totalDist += len;
+    }
+
+    const loc = this.locomotion;
+    const oldDepartCallback = loc.onDepartCallback;
+    loc.route = route;
+    loc.path = pts;
+    loc.segments = segments;
+    loc.totalDistance = totalDist;
+    loc.distance = 0;
+    loc.phase = 'walk_in';
+    loc.pose = 'stand';
+    loc.facing = (route.seat.x >= route.entry.x) ? 1 : -1;
+    loc.x = route.entry.x;
+    loc.y = route.entry.y;
+    loc.scale = route.entry.scale || 1.0;
+    loc.walkStep = 0;
+    loc.walkPhase = 0;
+    loc.hasDrink = false;
+    loc.receiveTimer = 0;
+    loc.onDepartCallback = oldDepartCallback;
+
+    this.computeCustomerPositionAlongPath(loc);
+  }
+
+  computeCustomerPositionAlongPath(loc) {
+    const route = loc.route;
+    if (!route || !loc.segments || loc.segments.length === 0) return;
+
+    const d = Math.max(0, Math.min(loc.totalDistance, loc.distance));
+    let seg = loc.segments.find(s => d >= s.startDist && d <= s.endDist);
+    if (!seg) {
+      seg = (d >= loc.totalDistance) ? loc.segments[loc.segments.length - 1] : loc.segments[0];
+    }
+
+    const segRatio = seg.length > 0 ? (d - seg.startDist) / seg.length : 0;
+    loc.x = seg.from.x + (seg.to.x - seg.from.x) * segRatio;
+    loc.y = seg.from.y + (seg.to.y - seg.from.y) * segRatio;
+
+    // Linear scale interpolation along y from entry.scale to scaleNear (perspective depth)
+    const entryScale = route.entry.scale || 1.0;
+    const nearScale = route.scaleNear || 1.0;
+    const dy = route.seat.y - route.entry.y;
+    if (Math.abs(dy) > 1) {
+      const ty = Math.max(0, Math.min(1, (loc.y - route.entry.y) / dy));
+      loc.scale = entryScale + (nearScale - entryScale) * ty;
+    } else {
+      const td = loc.totalDistance > 0 ? d / loc.totalDistance : 1;
+      loc.scale = entryScale + (nearScale - entryScale) * td;
+    }
+
+    // Direction facing
+    if (loc.phase === 'walk_in') {
+      const dx = seg.to.x - seg.from.x;
+      if (Math.abs(dx) > 0.5) loc.facing = dx >= 0 ? 1 : -1;
+    } else if (loc.phase === 'walk_out') {
+      const dx = seg.from.x - seg.to.x;
+      if (Math.abs(dx) > 0.5) loc.facing = dx >= 0 ? 1 : -1;
+    } else if (route.seat.facing !== undefined) {
+      loc.facing = route.seat.facing;
+    }
   }
 
   receiveDrink(emoji) {
@@ -574,6 +661,11 @@ class PixelSceneRenderer {
 
     // 5. Ambient Coffee Steam Animation
     this.renderCoffeeSteam(ctx);
+
+    // 6. Debug Mode Overlay (Press 'D' to toggle)
+    if (this.debugMode) {
+      this.renderDebugOverlay(ctx, this.currentSceneCfg || SCENE_CONFIGS[this.theme]);
+    }
   }
 
   // --- PROCEDURAL PIXEL CAT (MÈO CAM TABBY) ---
@@ -707,31 +799,36 @@ class PixelSceneRenderer {
 
     const loc = this.locomotion;
     const stride = 8.2; // px per walkPhase radian
+    const speed = 92; // px / sec
 
     if (loc.phase === 'walk_in') {
-      const speed = 108; // px / sec
-      const dx = speed * dt;
-      loc.x += dx;
-      loc.walkPhase += Math.abs(dx) / stride;
+      const delta = speed * dt;
+      loc.distance += delta;
+      loc.walkPhase += delta / (stride * (loc.scale || 1));
       loc.walkStep++;
-      if (loc.x >= loc.targetX) {
-        loc.x = loc.targetX;
-        loc.phase = 'idle';
+      if (loc.distance >= loc.totalDistance) {
+        loc.distance = loc.totalDistance;
+        const isSit = loc.route && loc.route.seat && loc.route.seat.pose === 'sit';
+        loc.phase = isSit ? 'seated' : 'idle';
+        loc.pose = isSit ? 'sit' : 'stand';
       }
+      this.computeCustomerPositionAlongPath(loc);
     } else if (loc.phase === 'receive') {
       loc.receiveTimer += dt;
       if (loc.receiveTimer >= 1.33) {
         loc.phase = 'walk_out';
+        loc.pose = 'stand'; // stands up to walk out
         loc.walkPhase = 0;
         loc.walkStep = 0;
       }
     } else if (loc.phase === 'walk_out') {
-      const speed = 120; // px / sec
-      const dx = speed * dt;
-      loc.x += dx;
-      loc.walkPhase += Math.abs(dx) / stride;
+      const delta = speed * dt;
+      loc.distance -= delta;
+      loc.walkPhase += delta / (stride * (loc.scale || 1));
       loc.walkStep++;
-      if (loc.x > this.width + 60) {
+      this.computeCustomerPositionAlongPath(loc);
+      if (loc.distance <= 0) {
+        loc.distance = 0;
         loc.phase = 'completed';
         if (loc.onDepartCallback) {
           loc.onDepartCallback();
@@ -780,51 +877,86 @@ class PixelSceneRenderer {
     const spriteKey = customer.spriteKey || 'vinh';
     const spriteImg = this.sprites[spriteKey];
 
-    // Locomotion Visual Offsets (Distance-locked walkPhase, time-locked idle/receive)
+    if (!spriteImg || !spriteImg.complete || spriteImg.naturalWidth <= 0) return;
+
+    const scale = loc.scale || 1.0;
+    const baseW = 60;
+    const baseH = 108;
+    const cw = baseW * scale;
+    const ch = baseH * scale;
+
+    // Locomotion Visual Offsets (Distance-locked walkPhase, time-locked idle/seated/receive)
     let bob = 0;
     let tilt = 0;
+    let seatOffsetY = 0;
+    const isSeated = (loc.phase === 'seated' || (loc.phase === 'receive' && loc.pose === 'sit'));
 
     if (loc.phase === 'walk_in' || loc.phase === 'walk_out') {
       const stepAngle = loc.walkPhase;
-      bob = Math.abs(Math.sin(stepAngle)) * 5.5;
+      bob = Math.abs(Math.sin(stepAngle)) * (5.5 * scale);
       tilt = Math.sin(stepAngle) * 0.04;
     } else if (loc.phase === 'idle') {
-      bob = Math.sin(this.simTime * 3.6) * 1.8;
+      bob = Math.sin(this.simTime * 3.6) * (1.8 * scale);
       tilt = 0;
+    } else if (loc.phase === 'seated') {
+      bob = Math.sin(this.simTime * 2.8) * (1.2 * scale); // gentle seated breathing
+      tilt = 0;
+      seatOffsetY = 7 * scale; // lowered torso when sitting
     } else if (loc.phase === 'receive') {
-      bob = Math.sin(loc.receiveTimer * 15) * 6; // happy bounce
+      bob = Math.sin(loc.receiveTimer * 15) * (6 * scale); // happy bounce
       tilt = 0;
+      if (loc.pose === 'sit') {
+        seatOffsetY = 7 * scale;
+      }
     }
 
-    if (!spriteImg || !spriteImg.complete || spriteImg.naturalWidth <= 0) return;
-
-    const cw = 60;
-    const ch = 108;
-    const cx = loc.x;
-    const cy = loc.y - bob;
+    const footX = loc.x;
+    const footY = loc.y;
+    const spriteCenterX = footX;
+    const spriteCenterY = footY - (ch / 2) - bob + seatOffsetY;
 
     ctx.save();
-    // 1. Drop shadow under character feet (stretches with walk)
-    const shadowScale = (loc.phase === 'walk_in' || loc.phase === 'walk_out')
-      ? (1 + Math.sin(loc.walkPhase) * 0.2)
-      : 1;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-    ctx.beginPath();
-    ctx.ellipse(cx + cw / 2, loc.y + ch - 4, 20 * shadowScale, 5, 0, 0, Math.PI * 2);
-    ctx.fill();
 
-    // 2. Draw Sprite with walk tilt
-    ctx.translate(cx + cw / 2, cy + ch / 2);
+    // 1. Drop shadow under character feet (or stool)
+    if (!isSeated) {
+      const shadowScale = (loc.phase === 'walk_in' || loc.phase === 'walk_out')
+        ? (1 + Math.sin(loc.walkPhase) * 0.2)
+        : 1;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+      ctx.beginPath();
+      ctx.ellipse(footX, footY - (3 * scale), 20 * scale * shadowScale, 5 * scale, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+      ctx.beginPath();
+      ctx.ellipse(footX, footY - (2 * scale), 18 * scale, 5 * scale, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 2. Draw Sprite with walk tilt or sitting clip
+    ctx.translate(spriteCenterX, spriteCenterY);
     if (loc.facing === -1) {
       ctx.scale(-1, 1);
     }
     ctx.rotate(tilt);
-    ctx.drawImage(spriteImg, -cw / 2, -ch / 2, cw, ch);
+
+    if (isSeated) {
+      // Sitting pose: clip lower legs below chair seat line so customer rests naturally on stool
+      ctx.save();
+      ctx.beginPath();
+      const clipBottomCut = 18 * scale;
+      ctx.rect(-cw / 2 - 4, -ch / 2 - 4, cw + 8, ch - clipBottomCut + 4);
+      ctx.clip();
+      ctx.drawImage(spriteImg, -cw / 2, -ch / 2, cw, ch);
+      ctx.restore();
+    } else {
+      ctx.drawImage(spriteImg, -cw / 2, -ch / 2, cw, ch);
+    }
 
     // 3. Draw Drink in Hand if customer received drink
     if (loc.hasDrink) {
-      ctx.font = '20px serif';
-      ctx.fillText(loc.drinkEmoji, cw / 2 - 8, -5);
+      ctx.font = `${Math.round(20 * scale)}px serif`;
+      ctx.fillText(loc.drinkEmoji, cw / 2 - (8 * scale), -5 * scale);
     }
 
     // 4. Happy expression hearts when receiving drink
@@ -832,6 +964,106 @@ class PixelSceneRenderer {
       ctx.font = '16px serif';
       ctx.fillText('💖', -15 + Math.sin(this.simTime * 6) * 6, -ch / 2 - 12);
       ctx.fillText('✨', 12, -ch / 2 - 18);
+    }
+
+    ctx.restore();
+  }
+
+  renderDebugOverlay(ctx, sceneCfg) {
+    if (!sceneCfg || !sceneCfg.route) return;
+    const route = sceneCfg.route;
+    const loc = this.locomotion;
+    const pts = [route.entry, ...(route.waypoints || []), route.seat];
+
+    ctx.save();
+
+    // 1. If Hoi An, draw Water Hazard SafeZone Box (x < 400 && y > 195)
+    if (this.theme === 'hoian') {
+      ctx.strokeStyle = 'rgba(239, 68, 68, 0.75)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 4]);
+      ctx.strokeRect(0, 195, 400, 165);
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.10)';
+      ctx.fillRect(0, 195, 400, 165);
+      ctx.fillStyle = '#f87171';
+      ctx.font = '11px "VT323", monospace, sans-serif';
+      ctx.fillText('⚠️ VÙNG SÔNG NƯỚC (x < 400 & y > 195) - CẤM ĐI QUA', 12, 212);
+    }
+
+    // 2. Waypoint route dashed path
+    ctx.strokeStyle = '#38bdf8';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    pts.forEach((p, idx) => {
+      if (idx === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // 3. Draw Points
+    pts.forEach((p, idx) => {
+      let color = '#f59e0b';
+      let label = `WP${idx} (${p.x}, ${p.y})`;
+      let r = 4;
+
+      if (idx === 0) {
+        color = '#22c55e'; // Green for Entry
+        label = `ENTRY (${p.x}, ${p.y}) [s=${p.scale || 1}]`;
+        r = 5;
+      } else if (idx === pts.length - 1) {
+        color = '#ec4899'; // Pink for Seat
+        label = `SEAT (${p.x}, ${p.y}) [${p.pose || 'stand'}]`;
+        r = 5;
+      }
+
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Label
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+      ctx.fillRect(p.x + 6, p.y - 13, label.length * 6 + 8, 15);
+      ctx.fillStyle = color;
+      ctx.font = '10px "VT323", monospace, sans-serif';
+      ctx.fillText(label, p.x + 9, p.y - 2);
+    });
+
+    // 4. Current Customer Position & Indicator
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath();
+    ctx.arc(loc.x, loc.y, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#fef08a';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // 5. Top-Left HUD Card
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+    ctx.strokeStyle = 'rgba(56, 189, 248, 0.6)';
+    ctx.lineWidth = 1;
+    ctx.fillRect(8, 8, 270, 60);
+    ctx.strokeRect(8, 8, 270, 60);
+
+    ctx.fillStyle = '#38bdf8';
+    ctx.font = '11px "VT323", monospace, sans-serif';
+    ctx.fillText(`🛠️ DEBUG: ${this.theme.toUpperCase()} (Phím D để Tắt/Bật)`, 14, 22);
+
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillText(`Phase: ${loc.phase} | Pose: ${loc.pose} | Facing: ${loc.facing > 0 ? 'Phải 👉' : 'Trái 👈'}`, 14, 35);
+    ctx.fillText(`Vị trí: (${Math.round(loc.x)}, ${Math.round(loc.y)}) | Scale: ${loc.scale ? loc.scale.toFixed(2) : '1.00'}`, 14, 48);
+    ctx.fillText(`Quãng đường: ${Math.round(loc.distance)} / ${Math.round(loc.totalDistance)} px`, 14, 60);
+
+    // 6. Cursor position if hovering on canvas
+    if (this.mouseDebug) {
+      ctx.fillStyle = '#fde047';
+      ctx.font = '10px "VT323", monospace, sans-serif';
+      ctx.fillText(`🖱️ (${this.mouseDebug.x}, ${this.mouseDebug.y})`, 180, 22);
     }
 
     ctx.restore();
@@ -941,8 +1173,14 @@ const SCENE_CONFIGS = {
   night: {
     key: 'night',
     name: '🌧️ Đêm Mưa Vỉa Hè (Phố Khuya)',
-    targetX: 155,
-    targetY: 175,
+    targetX: 185,
+    targetY: 283,
+    route: {
+      entry: { x: -50, y: 283, scale: 0.95 },
+      waypoints: [{ x: 60, y: 283 }],
+      seat: { x: 185, y: 283, pose: 'stand' },
+      scaleNear: 1.0
+    },
     cat: { baked: true, x: 500, y: 275, w: 90, h: 45 },
     customer: {
       id: 'vinh-driver',
@@ -979,8 +1217,14 @@ const SCENE_CONFIGS = {
   counter: {
     key: 'counter',
     name: '☕ Quầy Bar Gỗ Cổ Điển (Ấm Cúng)',
-    targetX: 195,
-    targetY: 172,
+    targetX: 225,
+    targetY: 280,
+    route: {
+      entry: { x: -50, y: 280, scale: 0.95 },
+      waypoints: [{ x: 90, y: 280 }],
+      seat: { x: 225, y: 280, pose: 'stand' },
+      scaleNear: 1.0
+    },
     cat: { baked: false, x: 510, y: 285, w: 38, h: 26 },
     customer: {
       id: 'hoa-student',
@@ -1017,8 +1261,14 @@ const SCENE_CONFIGS = {
   indoor: {
     key: 'indoor',
     name: '🏬 Quán Phố Hiện Đại (Rộn Ràng)',
-    targetX: 345,
-    targetY: 168,
+    targetX: 321,
+    targetY: 272,
+    route: {
+      entry: { x: 228, y: 188, scale: 0.55 },
+      waypoints: [{ x: 250, y: 215 }, { x: 300, y: 255 }],
+      seat: { x: 321, y: 272, pose: 'sit', facing: -1 },
+      scaleNear: 1.0
+    },
     cat: { baked: false, x: 485, y: 290, w: 38, h: 26 },
     customer: {
       id: 'lam-dev',
@@ -1054,8 +1304,14 @@ const SCENE_CONFIGS = {
   morning: {
     key: 'morning',
     name: '☀️ Sáng Sớm Phố Cổ (Cà Phê Sáng)',
-    targetX: 140,
-    targetY: 205,
+    targetX: 170,
+    targetY: 313,
+    route: {
+      entry: { x: -50, y: 313, scale: 0.95 },
+      waypoints: [{ x: 70, y: 313 }],
+      seat: { x: 170, y: 313, pose: 'stand' },
+      scaleNear: 1.0
+    },
     cat: { baked: false, x: 435, y: 285, w: 38, h: 26 },
     customer: {
       id: 'ba-elder',
@@ -1090,8 +1346,14 @@ const SCENE_CONFIGS = {
   hoian: {
     key: 'hoian',
     name: '🏮 Hoàng Hôn Bờ Sông Hội An (Bờ Sông Hoài)',
-    targetX: 330,
-    targetY: 195,
+    targetX: 433,
+    targetY: 270,
+    route: {
+      entry: { x: 520, y: 150, scale: 0.55 },
+      waypoints: [{ x: 480, y: 170 }, { x: 445, y: 240 }],
+      seat: { x: 433, y: 270, pose: 'sit', facing: -1 },
+      scaleNear: 1.0
+    },
     cat: { baked: false, x: 465, y: 280, w: 38, h: 26 },
     customer: {
       id: 'lan-merchant',
@@ -1126,6 +1388,29 @@ const SCENE_CONFIGS = {
     ]
   }
 };
+
+// Route & Safe Zone Validator
+function validateRouteSafeZone(themeKey, route) {
+  if (!route) return;
+  const pts = [
+    { pt: route.entry, name: 'entry' },
+    ...(route.waypoints || []).map((wp, idx) => ({ pt: wp, name: `waypoint[${idx}]` })),
+    { pt: route.seat, name: 'seat' }
+  ];
+
+  pts.forEach(({ pt, name }) => {
+    if (!pt) return;
+    // Hoi An water hazard: x < 400 && y > 190
+    if (themeKey === 'hoian' && pt.x < 400 && pt.y > 190) {
+      console.warn(`[SafeZone Hazard] Scene "${themeKey}" point "${name}" (${pt.x}, ${pt.y}) is inside the river area! Must have x >= 400 or y <= 190.`);
+    }
+  });
+}
+
+// Validate all scene routes at load time
+Object.keys(SCENE_CONFIGS).forEach(key => {
+  validateRouteSafeZone(key, SCENE_CONFIGS[key].route);
+});
 
 // --- SHOP ITEMS (TIỆM TẠP HÓA NÂNG CẤP) ---
 const SHOP_ITEMS = [
@@ -1182,6 +1467,9 @@ class GameController {
     const urlParams = new URLSearchParams(window.location.search);
     const sceneParam = urlParams.get('scene');
     this.currentThemeKey = (sceneParam && SCENE_CONFIGS[sceneParam]) ? sceneParam : 'night';
+    if (urlParams.get('debug') === '1' || urlParams.get('debug') === 'true') {
+      this.renderer.debugMode = true;
+    }
     this.coins = 0;
     this.hearts = 0;
     this.catState = 'sleep';
@@ -1315,6 +1603,15 @@ class GameController {
       }
     });
 
+    // Debug Mode Toggle: Press 'D'
+    window.addEventListener('keydown', (e) => {
+      if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+      if (e.key === 'd' || e.key === 'D') {
+        this.renderer.debugMode = !this.renderer.debugMode;
+        this.showToast(this.renderer.debugMode ? '🛠️ DEBUG MODE: BẬT (Đường đi & Tọa độ)' : '🛠️ DEBUG MODE: TẮT');
+      }
+    });
+
     // Canvas click: check if clicked on cat in current scene with 4px padding
     this.canvas.addEventListener('click', (e) => {
       const rect = this.canvas.getBoundingClientRect();
@@ -1327,11 +1624,13 @@ class GameController {
       }
     });
 
-    // Canvas hover: wake up cat when cursor approaches
+    // Canvas hover: wake up cat when cursor approaches & update debug coords
     this.canvas.addEventListener('mousemove', (e) => {
       const rect = this.canvas.getBoundingClientRect();
-      const x = (e.clientX - rect.left) * (this.canvas.width / rect.width);
-      const y = (e.clientY - rect.top) * (this.canvas.height / rect.height);
+      const x = Math.round((e.clientX - rect.left) * (this.canvas.width / rect.width));
+      const y = Math.round((e.clientY - rect.top) * (this.canvas.height / rect.height));
+      this.renderer.mouseDebug = { x, y };
+
       const sceneCfg = SCENE_CONFIGS[this.currentThemeKey];
       const cat = sceneCfg && sceneCfg.cat;
       if (cat && x >= cat.x - 6 && x <= cat.x + cat.w + 6 && y >= cat.y - 6 && y <= cat.y + cat.h + 6) {
@@ -1366,7 +1665,7 @@ class GameController {
     this.catState = 'sleep';
 
     // 1. Update Renderer & Audio
-    this.renderer.setTheme(themeKey, sceneCfg.targetX, sceneCfg.targetY);
+    this.renderer.setTheme(themeKey, sceneCfg);
     this.sound.setAmbientTheme(themeKey);
     document.getElementById('weather-status').textContent = sceneCfg.name;
 
@@ -2137,5 +2436,5 @@ class GameController {
 
 // Start game
 window.addEventListener('DOMContentLoaded', () => {
-  new GameController();
+  window.game = new GameController();
 });
