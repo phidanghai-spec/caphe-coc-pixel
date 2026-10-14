@@ -1358,6 +1358,11 @@ class GameController {
     this.currentThemeKey = themeKey;
     const sceneCfg = SCENE_CONFIGS[themeKey] || SCENE_CONFIGS.night;
 
+    // Reset cat state & timers when switching scenes
+    clearTimeout(this.catHappyTimer);
+    clearTimeout(this.catAwakeTimer);
+    this.catState = 'sleep';
+
     // 1. Update Renderer & Audio
     this.renderer.setTheme(themeKey, sceneCfg.targetX, sceneCfg.targetY);
     this.sound.setAmbientTheme(themeKey);
