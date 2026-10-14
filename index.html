@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cà Phê Cóc Vỉa Hè - Cozy Pixel Cafe Simulator</title>
+  <meta name="description" content="Trải nghiệm game pixel art thư giãn: Quán cà phê vỉa hè Việt Nam với quá trình pha chế tương tác đa dạng">
+  <!-- Google Fonts: VT323 & Silkscreen & Be Vietnam Pro -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Silkscreen:wght@400;700&family=VT323&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header / Top Bar -->
+    <header class="top-nav">
+      <div class="brand">
+        <span class="icon">☕</span>
+        <h1>CÀ PHÊ CÓC VỈA HÈ <span class="badge">SPRITE FORGE ED.</span></h1>
+      </div>
+
+      <!-- Theme Switcher Selector -->
+      <div class="theme-selector">
+        <span class="theme-label">BỐI CẢNH:</span>
+        <button class="btn-theme active" data-theme="night" id="theme-night">🌧️ Đêm Mưa</button>
+        <button class="btn-theme" data-theme="counter" id="theme-counter">☕ Quầy Bar Gỗ</button>
+        <button class="btn-theme" data-theme="indoor" id="theme-indoor">🏬 Quán Phố</button>
+        <button class="btn-theme" data-theme="morning" id="theme-morning">☀️ Sáng Sớm</button>
+        <button class="btn-theme" data-theme="hoian" id="theme-sunset">🏮 Hoàng Hôn</button>
+      </div>
+
+      <div class="audio-controls">
+        <button id="btn-toggle-ambient" class="btn-tool active" title="Bật/Tắt âm thanh môi trường">
+          🎧 <span class="btn-text">Mưa: BẬT</span>
+        </button>
+        <button id="btn-toggle-lofi" class="btn-tool" title="Bật/Tắt nhạc Lofi">
+          🎵 <span class="btn-text">Lofi: TẮT</span>
+        </button>
+        <button id="btn-open-shop" class="btn-tool btn-shop-glow" title="Cửa hàng nâng cấp quán">
+          🛒 <span class="btn-text">Nâng Cấp</span>
+        </button>
+        <button id="btn-open-polaroid" class="btn-tool" title="Chụp ảnh Polaroid kỷ niệm quán">
+          📸 <span class="btn-text">Chụp Ảnh</span>
+        </button>
+        <div class="stats-badge" id="player-stats">
+          💰 <span id="coin-count">0</span>đ | 💖 <span id="heart-count">0</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Game Workspace -->
+    <main class="main-stage">
+      <!-- Left: Cozy Pixel Viewport Canvas & RPG Dialogue -->
+      <section class="viewport-card">
+        <div class="canvas-wrapper">
+          <canvas id="cafe-canvas" width="640" height="360"></canvas>
+          <div class="scanline-overlay"></div>
+          <div class="weather-tag" id="weather-status">🌧️ Đêm Mưa Vỉa Hè (Phố Khuya)</div>
+          <button id="btn-quick-pet-cat" class="btn-canvas-cat" title="Vuốt ve chú mèo Miu Miu">
+            🐾 Vuốt ve mèo Miu Miu
+          </button>
+        </div>
+        
+        <!-- RPG Dialogue & Story Box -->
+        <div class="dialogue-box" id="dialogue-box">
+          <div class="customer-avatar-frame">
+            <img id="customer-avatar-img" src="assets/vinh_driver_portrait.png" alt="Khách hàng">
+          </div>
+          <div class="dialogue-content">
+            <div class="dialogue-header">
+              <span class="speaker-name" id="speaker-name">Chú Vinh (Xe Ôm Công Nghệ)</span>
+              <span class="order-badge" id="order-badge">Yêu cầu: <strong>Cà Phê Sữa Đá</strong></span>
+            </div>
+            <p class="speech-text" id="speech-text">
+              "Cho chú ly cà phê sữa đá nhiều sữa nghen con. Chạy cuốc cuối đêm ướt sũng cả áo rồi, uống ly cho ấm bụng..."
+            </p>
+            <!-- Interactive Dialogue Choices / Tương tác đối thoại -->
+            <div class="dialogue-choices" id="dialogue-choices"></div>
+            <div class="customer-status-row">
+              <span class="status-indicator" id="customer-emotion">Trạng thái: ⏳ Đang đợi nước...</span>
+              <div class="customer-actions-mini">
+                <span class="tip-potential" id="tip-potential">Thưởng tiềm năng: +25.000đ</span>
+                <button id="btn-next-customer" class="btn-skip-customer" title="Chuyển khách tiếp theo">Khách tiếp ⏭️</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right: Interactive Brewing Station (Quầy Pha Chế Tương Tác) -->
+      <aside class="brewing-station">
+        <div class="panel-header">
+          <h2>QUẦY PHA CHẾ TƯƠNG TÁC</h2>
+          <span class="step-guide" id="brewing-step-hint">Bước 1: Chọn nguyên liệu</span>
+        </div>
+
+        <!-- The Cup State & Interactive Workstation with Animated Barista Hands -->
+        <div class="cup-display-workspace">
+          <div class="cup-work-container">
+            <!-- Animated Barista Hands Overlay -->
+            <div class="barista-hands-overlay" id="barista-hands-overlay">
+              <!-- 1. Hand Pouring Condensed Milk (Lon Sữa Ông Thọ) -->
+              <div class="hand-anim hand-pour-milk" id="hand-pour-milk">
+                <div class="hand-arm"></div>
+                <div class="hand-can-milk">
+                  <div class="can-lid"></div>
+                  <div class="can-body"><span class="can-text">ÔNG THỌ</span></div>
+                </div>
+                <div class="fluid-stream stream-milk" id="stream-milk"></div>
+              </div>
+
+              <!-- 2. Hand Pouring Coffee (Ấm / Phin Cà Phê Bốc Khói) -->
+              <div class="hand-anim hand-pour-coffee" id="hand-pour-coffee">
+                <div class="hand-arm"></div>
+                <div class="hand-coffee-pot">
+                  <div class="pot-handle"></div>
+                  <div class="pot-spout"></div>
+                </div>
+                <div class="fluid-stream stream-coffee" id="stream-coffee"></div>
+              </div>
+
+              <!-- 3. Hand with Tongs Adding Ice (Kẹp Đá Inox) -->
+              <div class="hand-anim hand-add-ice" id="hand-add-ice">
+                <div class="hand-arm"></div>
+                <div class="tongs-body">
+                  <div class="tongs-pincer-left"></div>
+                  <div class="tongs-pincer-right"></div>
+                  <div class="tongs-ice-cube"></div>
+                </div>
+              </div>
+
+              <!-- 4. Hand Stirring with Long Spoon (Khuấy Muỗng Xoay Tròn) -->
+              <div class="hand-anim hand-stir" id="hand-stir-anim">
+                <div class="hand-arm"></div>
+                <div class="hand-wrist"></div>
+                <div class="hand-fingers-grip"></div>
+                <div class="stir-spoon-bar">
+                  <div class="spoon-scoop"></div>
+                </div>
+              </div>
+
+              <!-- 5. Hand Garnishing / Topping -->
+              <div class="hand-anim hand-garnish-topping" id="hand-garnish-anim">
+                <div class="hand-arm"></div>
+                <div class="hand-pinch-fingers">
+                  <div class="held-garnish-item" id="held-garnish-icon">🍑</div>
+                </div>
+              </div>
+
+              <!-- 6. Serving Hand Push -->
+              <div class="hand-anim hand-serve-push" id="hand-serve-anim">
+                <div class="hand-arm hand-arm-serving"></div>
+                <div class="hand-serving-palm">✨</div>
+              </div>
+            </div>
+
+            <!-- Glass Cup Component with Swirl Vortex -->
+            <div class="glass-cup" id="glass-cup">
+              <div class="glass-shine"></div>
+              <div class="liquid-vortex" id="liquid-vortex"></div>
+              <div class="liquid-layer liquid-coffee" id="layer-coffee"></div>
+              <div class="liquid-layer liquid-tea" id="layer-tea"></div>
+              <div class="liquid-layer liquid-egg-foam" id="layer-egg-foam"></div>
+              <div class="liquid-layer liquid-salt-cream" id="layer-salt-cream"></div>
+              <div class="garnish-layer" id="layer-garnish"></div>
+              <div class="ice-cubes" id="ice-cubes"></div>
+              <div class="condensed-milk-bottom" id="condensed-milk"></div>
+              <div class="spoon" id="spoon"></div>
+              <!-- Phin Dripping Animation -->
+              <div class="phin-station" id="phin-station">
+                <div class="phin-cap"></div>
+                <div class="phin-body"></div>
+                <div class="phin-drips" id="phin-drips"></div>
+              </div>
+            </div>
+
+            <!-- Accompanying Food / Snack Plate -->
+            <div class="dish-plate-wrapper" id="dish-plate-wrapper">
+              <div class="plate-dish" id="plate-dish">
+                <div class="dish-icon" id="dish-icon">🥖</div>
+                <div class="dish-label" id="dish-label">Bánh Mì Giòn</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="cup-status" id="cup-status">Ly trống...</div>
+        </div>
+
+        <!-- Interactive Minigame Card: Đánh Bông Kem Trứng (Cà Phê Trứng) -->
+        <div class="interactive-minigame-card" id="minigame-card">
+          <div class="minigame-header">
+            <span id="minigame-title">🥣 Minigame: Đánh Bông Kem Trứng</span>
+            <span id="minigame-progress-txt">Độ bông: 0%</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="minigame-bar"></div>
+          </div>
+          <button class="btn-minigame-action" id="btn-whisk-action">
+            ⚡ BẤM NHANH ĐỂ ĐÁNH BÔNG KEM TRỨNG!
+          </button>
+        </div>
+
+        <!-- Ingredient Action Grid (Nguyên Liệu Phong Phú Theo Bối Cảnh) -->
+        <div class="ingredient-grid" id="ingredient-grid">
+          <!-- Dynamically populated or customized per theme -->
+        </div>
+
+        <!-- Action Controls -->
+        <div class="brew-actions">
+          <button class="btn-action btn-stir" id="btn-stir" disabled>
+            🥄 Khuấy Đều
+          </button>
+          <button class="btn-action btn-reset" id="btn-reset">
+            🔄 Làm Lại
+          </button>
+          <button class="btn-action btn-serve" id="btn-serve" disabled>
+            ✨ Giao Cho Khách
+          </button>
+        </div>
+
+        <!-- Recipe Reference Drawer (Theo Bối Cảnh) -->
+        <div class="recipe-notes" id="recipe-notes-box">
+          <div class="recipe-title" id="recipe-menu-title">📖 Sổ Tay Menu: Đêm Mưa Vỉa Hè</div>
+          <ul id="recipe-list">
+            <!-- Dynamically populated per theme -->
+          </ul>
+        </div>
+      </aside>
+    </main>
+
+    <!-- Modal: Cửa Hàng Nâng Cấp Quán (Cozy Shop) -->
+    <div id="shop-modal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3>🏬 TIỆM TẠP HÓA & NÂNG CẤP QUÁN</h3>
+          <button id="btn-close-shop" class="btn-close-modal">✕</button>
+        </div>
+        <p class="modal-subtitle">Dùng tiền tip và trái tim khách tặng để sắm sửa nâng cấp quán cà phê cóc!</p>
+        <div class="shop-grid" id="shop-items-grid">
+          <!-- Items injected via JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Chụp Ảnh Polaroid Kỷ Niệm -->
+    <div id="polaroid-modal" class="modal-overlay hidden">
+      <div class="modal-card polaroid-card-wrapper">
+        <div class="modal-header">
+          <h3>📸 ẢNH POLAROID KỶ NIỆM</h3>
+          <button id="btn-close-polaroid" class="btn-close-modal">✕</button>
+        </div>
+        <div class="polaroid-frame" id="polaroid-frame">
+          <img id="polaroid-img" alt="Ảnh Polaroid Quán">
+          <div class="polaroid-caption" id="polaroid-caption">
+            <span class="polaroid-text">Cà Phê Cóc Vỉa Hè • Kỷ Niệm Quán</span>
+            <span class="polaroid-date" id="polaroid-date">Hà Nội / Sài Gòn / Hội An</span>
+          </div>
+        </div>
+        <div class="polaroid-controls">
+          <button id="btn-download-polaroid" class="btn-action btn-serve">💾 Lưu Ảnh Về Máy</button>
+          <button id="btn-close-polaroid-btn" class="btn-action btn-reset">Đóng</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <script src="story.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

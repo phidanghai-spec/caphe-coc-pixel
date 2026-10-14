@@ -1,0 +1,15 @@
+# Operating System Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor & IDE files
+.vscode/
+.idea/
+
+# Downloaded HTML references
+assets/*.htm
+
+# Logs & Temp
+*.log
+scratch/

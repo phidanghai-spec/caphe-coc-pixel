@@ -1,0 +1,1470 @@
+:root {
+  --bg-primary: #0b0d14;
+  --bg-card: rgba(18, 22, 38, 0.92);
+  --bg-card-border: rgba(255, 184, 108, 0.25);
+  --accent-warm: #ffb86c;
+  --accent-amber: #f59e0b;
+  --accent-coffee: #451a03;
+  --accent-tea: #10b981;
+  --accent-neon: #38bdf8;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --pixel-font: 'Silkscreen', 'VT323', monospace;
+  --ui-font: 'Be Vietnam Pro', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background-color: var(--bg-primary);
+  background-image: 
+    radial-gradient(circle at 15% 25%, rgba(245, 158, 11, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 85% 75%, rgba(56, 189, 248, 0.07) 0%, transparent 50%),
+    linear-gradient(180deg, #090a10 0%, #111424 100%);
+  color: var(--text-main);
+  font-family: var(--ui-font);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 16px;
+  overflow-x: hidden;
+}
+
+.app-container {
+  width: 100%;
+  max-width: 1140px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* --- Top Navigation --- */
+.top-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid var(--bg-card-border);
+  padding: 10px 18px;
+  border-radius: 14px;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand .icon {
+  font-size: 1.6rem;
+  animation: gentle-steam 2s infinite ease-in-out;
+}
+
+.brand h1 {
+  font-family: var(--pixel-font);
+  font-size: 0.95rem;
+  letter-spacing: 1px;
+  color: var(--accent-warm);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.badge {
+  font-family: var(--ui-font);
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: white;
+  padding: 2px 7px;
+  border-radius: 6px;
+  letter-spacing: 0.5px;
+}
+
+/* Theme Switcher */
+.theme-selector {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 4px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.theme-label {
+  font-family: var(--pixel-font);
+  font-size: 0.7rem;
+  color: var(--accent-warm);
+  margin-right: 4px;
+}
+
+.btn-theme {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--ui-font);
+  font-weight: 500;
+}
+
+.btn-theme:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.btn-theme.active {
+  background: rgba(245, 158, 11, 0.25);
+  border-color: var(--accent-amber);
+  color: var(--accent-warm);
+  font-weight: 700;
+}
+
+.audio-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-tool {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-main);
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.btn-tool:hover {
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+.btn-tool.active {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: var(--accent-amber);
+  color: var(--accent-warm);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.25);
+}
+
+.stats-badge {
+  background: rgba(0, 0, 0, 0.5);
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 184, 108, 0.3);
+  font-family: var(--pixel-font);
+  font-size: 0.8rem;
+  color: #fde047;
+}
+
+/* --- Main Stage --- */
+.main-stage {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 950px) {
+  .main-stage {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Left: Viewport & RPG Dialogue --- */
+.viewport-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.canvas-wrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 2px solid rgba(255, 184, 108, 0.3);
+  box-shadow: 0 14px 44px rgba(0, 0, 0, 0.7);
+  background: #000;
+}
+
+#cafe-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.scanline-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.2) 50%);
+  background-size: 100% 4px;
+  opacity: 0.45;
+}
+
+.weather-tag {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(8px);
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  color: var(--accent-neon);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  font-family: var(--pixel-font);
+}
+
+/* RPG Dialogue Box with Sprite Portrait */
+.dialogue-box {
+  background: var(--bg-card);
+  border: 2px solid rgba(245, 158, 11, 0.35);
+  padding: 14px;
+  border-radius: 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+}
+
+.customer-avatar-frame {
+  width: 72px;
+  height: 72px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 2px solid var(--accent-amber);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.2);
+}
+
+.customer-avatar-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: pixelated;
+  animation: avatar-pulse 3s infinite ease-in-out;
+}
+
+.dialogue-content {
+  flex: 1;
+}
+
+.dialogue-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.speaker-name {
+  font-family: var(--pixel-font);
+  font-size: 0.85rem;
+  color: var(--accent-warm);
+}
+
+.order-badge {
+  background: rgba(245, 158, 11, 0.18);
+  border: 1px solid var(--accent-amber);
+  color: #fef08a;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-family: var(--ui-font);
+}
+
+.speech-text {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: #f1f5f9;
+  margin-bottom: 8px;
+  min-height: 44px;
+}
+
+.customer-status-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.tip-potential {
+  color: #fde047;
+  font-family: var(--pixel-font);
+  font-size: 0.75rem;
+}
+
+/* --- Right: Brewing Station --- */
+.brewing-station {
+  background: var(--bg-card);
+  border: 1px solid var(--bg-card-border);
+  border-radius: 14px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 8px;
+}
+
+.panel-header h2 {
+  font-family: var(--pixel-font);
+  font-size: 0.95rem;
+  color: var(--accent-warm);
+}
+
+.step-guide {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Cup Display Workspace & Animated Barista Hands */
+.cup-display-workspace {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  width: 100%;
+}
+
+.cup-work-container {
+  position: relative;
+  width: 100%;
+  min-height: 185px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 16px;
+  padding-bottom: 8px;
+}
+
+/* --- BARISTA HANDS OVERLAY SYSTEM --- */
+.barista-hands-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+  overflow: visible;
+}
+
+.hand-anim {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  z-index: 35;
+}
+
+.hand-anim.active {
+  opacity: 1;
+}
+
+/* 1. Hand Pouring Milk (Lon Sữa Ông Thọ) */
+.hand-pour-milk {
+  top: 5px;
+  left: 20%;
+  transform: translate(-10px, -20px) rotate(-15deg);
+}
+
+.hand-pour-milk.active {
+  animation: pourMilkAction 2.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.hand-arm {
+  width: 70px;
+  height: 26px;
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 40%, #e08a50 40%, #c26e38 100%);
+  border-radius: 6px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+}
+
+.hand-can-milk {
+  width: 44px;
+  height: 52px;
+  background: linear-gradient(135deg, #fef08a 0%, #facc15 60%, #ca8a04 100%);
+  border: 2px solid #a16207;
+  border-radius: 6px;
+  position: relative;
+  margin-top: -12px;
+  margin-left: 45px;
+  box-shadow: -2px 4px 8px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.can-lid {
+  position: absolute;
+  top: -4px;
+  left: 3px;
+  right: 3px;
+  height: 5px;
+  background: #cbd5e1;
+  border: 1px solid #64748b;
+  border-radius: 2px;
+}
+
+.can-body .can-text {
+  font-family: var(--pixel-font);
+  font-size: 0.55rem;
+  font-weight: 700;
+  color: #dc2626;
+  background: #fff;
+  padding: 1px 3px;
+  border-radius: 3px;
+  letter-spacing: -0.5px;
+}
+
+.fluid-stream {
+  position: absolute;
+  width: 4px;
+  border-radius: 2px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.stream-milk {
+  top: 50px;
+  left: 92px;
+  height: 0px;
+  background: linear-gradient(180deg, #fef08a 0%, #ffffff 100%);
+  box-shadow: 0 0 6px rgba(254, 240, 138, 0.8);
+}
+
+.hand-pour-milk.active .stream-milk {
+  animation: streamMilkFlow 1.6s 0.3s ease-in-out forwards;
+}
+
+/* 2. Hand Pouring Coffee (Ấm / Phin Rót Cà Phê) */
+.hand-pour-coffee {
+  top: 8px;
+  right: 22%;
+  transform: translate(15px, -20px) rotate(15deg);
+}
+
+.hand-pour-coffee.active {
+  animation: pourCoffeeAction 2.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.hand-coffee-pot {
+  width: 48px;
+  height: 48px;
+  background: linear-gradient(135deg, #94a3b8 0%, #64748b 50%, #475569 100%);
+  border: 2px solid #334155;
+  border-radius: 4px 4px 12px 12px;
+  position: relative;
+  margin-top: -10px;
+  margin-right: 40px;
+  box-shadow: 2px 4px 10px rgba(0, 0, 0, 0.4);
+}
+
+.pot-handle {
+  position: absolute;
+  right: -12px;
+  top: 8px;
+  width: 12px;
+  height: 28px;
+  border: 3px solid #1e293b;
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+}
+
+.pot-spout {
+  position: absolute;
+  left: -8px;
+  top: 6px;
+  width: 10px;
+  height: 8px;
+  background: #64748b;
+  clip-path: polygon(100% 0, 0 50%, 100% 100%);
+}
+
+.stream-coffee {
+  top: 48px;
+  left: -4px;
+  height: 0px;
+  background: linear-gradient(180deg, #3b1703 0%, #270e02 100%);
+  box-shadow: 0 0 6px rgba(59, 23, 3, 0.8);
+}
+
+.hand-pour-coffee.active .stream-coffee {
+  animation: streamCoffeeFlow 1.6s 0.3s ease-in-out forwards;
+}
+
+/* 3. Hand with Tongs Adding Ice */
+.hand-add-ice {
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-25px);
+}
+
+.hand-add-ice.active {
+  animation: dropIceTongsAction 1.6s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+.tongs-body {
+  position: relative;
+  width: 32px;
+  height: 55px;
+  margin-left: 20px;
+}
+
+.tongs-pincer-left, .tongs-pincer-right {
+  position: absolute;
+  top: 0;
+  width: 4px;
+  height: 48px;
+  background: linear-gradient(180deg, #cbd5e1, #94a3b8);
+  border-radius: 2px;
+}
+
+.tongs-pincer-left { left: 4px; transform: rotate(8deg); }
+.tongs-pincer-right { right: 4px; transform: rotate(-8deg); }
+
+.tongs-ice-cube {
+  position: absolute;
+  bottom: 4px;
+  left: 7px;
+  width: 18px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid #fff;
+  border-radius: 3px;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+}
+
+/* 4. Hand Stirring with Long Spoon */
+.hand-stir {
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-10px);
+}
+
+.hand-stir.active {
+  animation: handStirAction 2.4s ease-in-out forwards;
+}
+
+.hand-wrist {
+  width: 22px;
+  height: 28px;
+  background: #e08a50;
+  border-radius: 4px;
+  margin: 0 auto;
+}
+
+.hand-fingers-grip {
+  width: 26px;
+  height: 18px;
+  background: #c26e38;
+  border-radius: 6px;
+  margin: -4px auto 0 auto;
+  border: 1px solid #a15525;
+}
+
+.stir-spoon-bar {
+  width: 5px;
+  height: 135px;
+  background: linear-gradient(90deg, #94a3b8, #f1f5f9, #64748b);
+  margin: 0 auto;
+  position: relative;
+}
+
+.spoon-scoop {
+  position: absolute;
+  bottom: 0;
+  left: -4px;
+  width: 13px;
+  height: 18px;
+  background: #cbd5e1;
+  border-radius: 50%;
+  border: 1px solid #94a3b8;
+}
+
+/* 5. Hand Garnishing / Topping */
+.hand-garnish-topping {
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+}
+
+.hand-garnish-topping.active {
+  animation: handGarnishAction 1.6s ease-in-out forwards;
+}
+
+.hand-pinch-fingers {
+  width: 24px;
+  height: 22px;
+  background: #e08a50;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 25px;
+}
+
+.held-garnish-item {
+  font-size: 1.4rem;
+  margin-top: 15px;
+}
+
+/* 6. Hand Serving Push */
+.hand-serve-push {
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(30px);
+}
+
+.hand-serve-push.active {
+  animation: handServePushAction 1.8s ease-in-out forwards;
+}
+
+.hand-arm-serving {
+  width: 110px;
+  height: 28px;
+  background: linear-gradient(90deg, #1e293b, #e08a50);
+}
+
+.hand-serving-palm {
+  font-size: 1.5rem;
+  color: #fde047;
+  text-shadow: 0 0 10px #f59e0b;
+}
+
+/* Accompanying Food / Snack Plate */
+.dish-plate-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.plate-dish {
+  width: 68px;
+  height: 68px;
+  background: radial-gradient(circle at 50% 40%, #f8fafc 0%, #cbd5e1 75%, #94a3b8 100%);
+  border: 3px solid #64748b;
+  border-radius: 50%;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.6), inset 0 2px 4px rgba(255, 255, 255, 0.8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.plate-dish:hover {
+  transform: scale(1.08) translateY(-2px);
+}
+
+.dish-icon {
+  font-size: 1.7rem;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.4));
+  animation: gentle-steam 3s infinite ease-in-out;
+}
+
+.dish-label {
+  font-size: 0.6rem;
+  font-family: var(--pixel-font);
+  color: var(--accent-warm);
+  margin-top: 4px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* Glass Cup with Ribbed Pattern & Liquid Vortex */
+.glass-cup {
+  width: 96px;
+  height: 130px;
+  border: 3px solid rgba(255, 255, 255, 0.75);
+  border-top: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 0 0 18px 18px;
+  position: relative;
+  overflow: hidden;
+  background: 
+    repeating-linear-gradient(90deg, 
+      rgba(255, 255, 255, 0.08) 0px, 
+      rgba(255, 255, 255, 0.08) 4px, 
+      rgba(255, 255, 255, 0.02) 4px, 
+      rgba(255, 255, 255, 0.02) 12px
+    ),
+    radial-gradient(circle at 50% 10%, rgba(255, 255, 255, 0.15), rgba(0, 0, 0, 0.4));
+  box-shadow: 
+    0 8px 24px rgba(0, 0, 0, 0.6), 
+    inset 0 0 16px rgba(255, 255, 255, 0.15),
+    inset 2px 0 6px rgba(255, 255, 255, 0.25),
+    inset -2px 0 6px rgba(255, 255, 255, 0.25);
+  transition: transform 0.4s ease;
+}
+
+.liquid-vortex {
+  position: absolute;
+  inset: 0;
+  border-radius: 0 0 16px 16px;
+  background: radial-gradient(ellipse at 50% 50%, rgba(217, 119, 6, 0.5) 0%, transparent 70%);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 4;
+}
+
+.liquid-vortex.active {
+  opacity: 1;
+  animation: vortexSwirl 0.5s infinite linear;
+}
+
+.liquid-salt-cream {
+  background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
+  border-bottom: 2px dashed #94a3b8;
+  z-index: 5;
+}
+
+/* Animations for Hand Actions */
+@keyframes pourMilkAction {
+  0% { opacity: 0; transform: translate(-20px, -35px) rotate(0deg); }
+  20% { opacity: 1; transform: translate(-5px, -15px) rotate(-45deg); }
+  75% { opacity: 1; transform: translate(-5px, -15px) rotate(-45deg); }
+  90% { opacity: 1; transform: translate(-10px, -25px) rotate(-15deg); }
+  100% { opacity: 0; transform: translate(-20px, -35px) rotate(0deg); }
+}
+
+@keyframes streamMilkFlow {
+  0% { height: 0px; opacity: 1; }
+  15% { height: 70px; opacity: 1; }
+  85% { height: 70px; opacity: 1; }
+  100% { height: 0px; opacity: 0; }
+}
+
+@keyframes pourCoffeeAction {
+  0% { opacity: 0; transform: translate(30px, -35px) rotate(0deg); }
+  20% { opacity: 1; transform: translate(10px, -15px) rotate(42deg); }
+  75% { opacity: 1; transform: translate(10px, -15px) rotate(42deg); }
+  90% { opacity: 1; transform: translate(20px, -25px) rotate(15deg); }
+  100% { opacity: 0; transform: translate(30px, -35px) rotate(0deg); }
+}
+
+@keyframes streamCoffeeFlow {
+  0% { height: 0px; opacity: 1; }
+  15% { height: 75px; opacity: 1; }
+  85% { height: 75px; opacity: 1; }
+  100% { height: 0px; opacity: 0; }
+}
+
+@keyframes dropIceTongsAction {
+  0% { opacity: 0; transform: translateX(-50%) translateY(-35px); }
+  30% { opacity: 1; transform: translateX(-50%) translateY(0px); }
+  60% { opacity: 1; transform: translateX(-50%) translateY(0px); }
+  85% { opacity: 1; transform: translateX(-50%) translateY(-20px); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-35px); }
+}
+
+@keyframes handStirAction {
+  0% { opacity: 0; transform: translateX(-50%) translateY(-30px); }
+  15% { opacity: 1; transform: translateX(-50%) translateY(5px); }
+  25% { transform: translateX(calc(-50% + 8px)) translateY(5px) rotate(8deg); }
+  45% { transform: translateX(calc(-50% - 8px)) translateY(5px) rotate(-8deg); }
+  65% { transform: translateX(calc(-50% + 8px)) translateY(5px) rotate(8deg); }
+  85% { transform: translateX(-50%) translateY(5px) rotate(0deg); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-30px); }
+}
+
+@keyframes vortexSwirl {
+  0% { transform: rotate(0deg) scale(0.9); }
+  50% { transform: rotate(180deg) scale(1.05); }
+  100% { transform: rotate(360deg) scale(0.9); }
+}
+
+@keyframes handGarnishAction {
+  0% { opacity: 0; transform: translateX(-50%) translateY(-30px); }
+  35% { opacity: 1; transform: translateX(-50%) translateY(0px); }
+  75% { opacity: 1; transform: translateX(-50%) translateY(0px); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-30px); }
+}
+
+@keyframes handServePushAction {
+  0% { opacity: 0; transform: translateX(-50%) translateY(30px); }
+  30% { opacity: 1; transform: translateX(-50%) translateY(0px); }
+  75% { opacity: 1; transform: translateX(-50%) translateY(0px); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-25px); }
+}
+
+.lemongrass-stick {
+  width: 5px;
+  height: 35px;
+  background: #84cc16;
+  border: 1px solid #4d7c0f;
+  transform: rotate(-25deg);
+}
+
+.ice-cubes {
+  position: absolute;
+  bottom: 12px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  z-index: 6;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.ice-cube {
+  width: 18px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  border-radius: 3px;
+  transform: rotate(15deg);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.4);
+}
+
+/* Phin station dripping animation */
+.phin-station {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 50px;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  z-index: 10;
+}
+
+.phin-station.active {
+  display: flex;
+}
+
+.phin-cap {
+  width: 44px;
+  height: 10px;
+  background: #94a3b8;
+  border-radius: 3px 3px 0 0;
+}
+
+.phin-body {
+  width: 38px;
+  height: 22px;
+  background: #64748b;
+  border-radius: 0 0 3px 3px;
+  border: 1px solid #475569;
+}
+
+.phin-drips {
+  width: 3px;
+  height: 10px;
+  background: #451a03;
+  border-radius: 2px;
+  margin-top: 4px;
+  animation: phin-drop 0.8s infinite ease-in;
+}
+
+.spoon {
+  position: absolute;
+  top: -20px;
+  left: 45%;
+  width: 6px;
+  height: 135px;
+  background: linear-gradient(90deg, #94a3b8, #cbd5e1);
+  border-radius: 4px;
+  z-index: 8;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.5s ease;
+}
+
+.spoon.stirring {
+  opacity: 1;
+  animation: stir-animation 0.5s infinite ease-in-out;
+}
+
+.cup-status {
+  font-family: var(--pixel-font);
+  font-size: 0.8rem;
+  color: var(--accent-warm);
+}
+
+/* Interactive Minigame Card (Đánh Bông Kem Trứng) */
+.interactive-minigame-card {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px dashed var(--accent-amber);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  animation: fadeIn 0.3s ease;
+}
+
+.interactive-minigame-card.active {
+  display: flex;
+}
+
+.minigame-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #fde047;
+}
+
+.progress-bar-bg {
+  width: 100%;
+  height: 12px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.progress-bar-fill {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #f59e0b, #eab308, #fef08a);
+  transition: width 0.1s ease;
+}
+
+.btn-minigame-action {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #111827;
+  border: none;
+  padding: 8px;
+  border-radius: 6px;
+  font-family: var(--pixel-font);
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.btn-minigame-action:active {
+  transform: scale(0.96);
+}
+
+/* Ingredient Action Grid */
+.ingredient-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.btn-ingredient {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-main);
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.btn-ingredient:hover {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: var(--accent-amber);
+  transform: translateY(-2px);
+}
+
+.btn-ingredient:active {
+  transform: translateY(0);
+}
+
+.ing-icon {
+  font-size: 1.15rem;
+}
+
+/* Action Controls */
+.brew-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.2fr;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.btn-action {
+  padding: 9px 8px;
+  border-radius: 8px;
+  border: none;
+  font-family: var(--pixel-font);
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.btn-stir {
+  background: #334155;
+  color: #e2e8f0;
+}
+.btn-stir:not(:disabled):hover {
+  background: #475569;
+}
+
+.btn-reset {
+  background: #451a03;
+  color: #fed7aa;
+}
+.btn-reset:hover {
+  background: #78350f;
+}
+
+.btn-serve {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #111827;
+  font-weight: 700;
+}
+.btn-serve:not(:disabled):hover {
+  filter: brightness(1.15);
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.5);
+}
+
+.btn-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: grayscale(1);
+}
+
+/* Recipe Drawer */
+.recipe-notes {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.recipe-title {
+  font-weight: 600;
+  color: var(--accent-warm);
+  margin-bottom: 3px;
+}
+
+.recipe-notes ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.recipe-notes strong {
+  color: #cbd5e1;
+}
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid var(--accent-amber);
+  color: var(--text-main);
+  padding: 10px 20px;
+  border-radius: 30px;
+  font-size: 0.9rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+  z-index: 100;
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+.toast.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 20px);
+}
+
+/* Animations */
+@keyframes gentle-steam {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes avatar-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+@keyframes phin-drop {
+  0% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(24px); opacity: 0; }
+}
+
+@keyframes stir-animation {
+  0% { transform: rotate(0deg) translateX(0); }
+  25% { transform: rotate(10deg) translateX(6px); }
+  50% { transform: rotate(0deg) translateX(0); }
+  75% { transform: rotate(-10deg) translateX(-6px); }
+  100% { transform: rotate(0deg) translateX(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- Interactive Enhancements --- */
+.btn-shop-glow {
+  background: rgba(245, 158, 11, 0.18) !important;
+  border-color: var(--accent-amber) !important;
+  color: var(--accent-warm) !important;
+  animation: glow-pulse 2s infinite ease-in-out;
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 5px rgba(245, 158, 11, 0.3); }
+  50% { box-shadow: 0 0 14px rgba(245, 158, 11, 0.7); }
+}
+
+/* Quick Pet Cat Button on Canvas */
+.btn-canvas-cat {
+  position: absolute;
+  bottom: 12px;
+  right: 14px;
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(254, 240, 138, 0.4);
+  color: #fef08a;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-family: var(--pixel-font);
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: all 0.2s ease;
+  z-index: 10;
+}
+
+.btn-canvas-cat:hover {
+  background: rgba(245, 158, 11, 0.35);
+  border-color: #f59e0b;
+  transform: translateY(-2px) scale(1.05);
+}
+
+/* Skip/Next Customer Mini Button */
+.customer-actions-mini {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-skip-customer {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--text-main);
+  font-family: var(--pixel-font);
+  font-size: 0.65rem;
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-skip-customer:hover {
+  background: rgba(245, 158, 11, 0.25);
+  border-color: var(--accent-amber);
+  color: var(--accent-warm);
+}
+
+/* Dialogue Choices (Tương tác phân nhánh) */
+.dialogue-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 10px 0;
+}
+
+.dialogue-choice-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 184, 108, 0.25);
+  color: #e2e8f0;
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--ui-font);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dialogue-choice-btn:hover {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: var(--accent-amber);
+  color: #fef08a;
+  transform: translateX(4px);
+}
+
+.dialogue-choice-btn.selected {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: #10b981;
+  color: #a7f3d0;
+  pointer-events: none;
+}
+
+/* Modals Overlay */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+  animation: modalFadeIn 0.25s ease;
+}
+
+.modal-overlay.hidden {
+  display: none;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.modal-card {
+  background: #111526;
+  border: 2px solid var(--accent-amber);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 620px;
+  padding: 20px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.9);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 10px;
+  margin-bottom: 8px;
+}
+
+.modal-header h3 {
+  font-family: var(--pixel-font);
+  font-size: 1rem;
+  color: var(--accent-warm);
+}
+
+.btn-close-modal {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  transition: color 0.2s;
+}
+
+.btn-close-modal:hover {
+  color: #ef4444;
+}
+
+.modal-subtitle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+}
+
+/* Shop Items Grid */
+.shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 12px;
+}
+
+.shop-item-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 184, 108, 0.2);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.shop-item-card:hover {
+  border-color: var(--accent-amber);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.shop-item-card.purchased {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.shop-item-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.shop-item-icon {
+  font-size: 1.6rem;
+}
+
+.shop-item-name {
+  font-family: var(--pixel-font);
+  font-size: 0.82rem;
+  color: var(--accent-warm);
+}
+
+.shop-item-desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  flex: 1;
+}
+
+.shop-item-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.shop-item-price {
+  font-family: var(--pixel-font);
+  font-size: 0.78rem;
+  color: #fde047;
+}
+
+.btn-buy-item {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  border: none;
+  color: white;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-family: var(--pixel-font);
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.btn-buy-item:hover {
+  transform: translateY(-1px);
+}
+
+.btn-buy-item:disabled {
+  background: #334155;
+  color: #64748b;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Polaroid Modal */
+.polaroid-card-wrapper {
+  max-width: 460px;
+  text-align: center;
+}
+
+.polaroid-frame {
+  background: #f8fafc;
+  padding: 16px 16px 24px 16px;
+  border-radius: 6px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+  margin: 14px auto;
+  width: 100%;
+}
+
+#polaroid-img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 3px;
+  display: block;
+  image-rendering: pixelated;
+  border: 1px solid #cbd5e1;
+}
+
+.polaroid-caption {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #1e293b;
+}
+
+.polaroid-text {
+  font-family: var(--pixel-font);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.polaroid-date {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-style: italic;
+}
+
+.polaroid-controls {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+/* Floating Heart Animation */
+.floating-heart {
+  position: fixed;
+  font-size: 1.5rem;
+  pointer-events: none;
+  z-index: 9999;
+  animation: floatHeart 1.4s ease-out forwards;
+}
+
+@keyframes floatHeart {
+  0% { transform: translate(0, 0) scale(0.6); opacity: 1; }
+  50% { transform: translate(-10px, -40px) scale(1.3); opacity: 0.9; }
+  100% { transform: translate(15px, -90px) scale(1); opacity: 0; }
+}
