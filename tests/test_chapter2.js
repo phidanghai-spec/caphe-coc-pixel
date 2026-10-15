@@ -147,6 +147,47 @@ async function run() {
   assert(fetchLog.length === 1 && fetchLog[0] === 'assets/sprites/index.json', 'Chỉ gửi đúng 1 request nạp index.json (200 OK)');
   assert(!fetchLog.some(url => url.includes('aseprite') || url.includes('engine-export')), 'Hoàn toàn không gửi bất kỳ request thăm dò file sprite nào khi available rỗng (0 lỗi 404)');
 
+  // --- PHẦN 4: KIỂM TRA HÀM CHUYỂN ĐỘNG THUẦN (COMPUTE CUSTOMER MOTION) ---
+  console.log('\n4. Kiểm tra hàm thuần computeCustomerMotion:');
+  const computeMotion = global.computeCustomerMotion;
+  assert(typeof computeMotion === 'function', 'computeCustomerMotion được export toàn cục');
+
+  // 4a. phase 'walk_in' với simTime bất kỳ: breathe === 0
+  const walkMotion1 = computeMotion({ phase: 'walk_in', walkPhase: 1.5 }, 12.34);
+  const walkMotion2 = computeMotion({ phase: 'walk_in', walkPhase: 3.0 }, 99.99);
+  assert(walkMotion1.breathe === 0 && walkMotion2.breathe === 0, "phase 'walk_in' với simTime bất kỳ: breathe === 0");
+
+  // 4b. phase 'idle': breathe nằm trong [-0.012, 0.012]
+  const idleMotion1 = computeMotion({ phase: 'idle' }, 0);
+  const idleMotion2 = computeMotion({ phase: 'idle' }, 1.2);
+  const idleMotion3 = computeMotion({ phase: 'idle' }, 5.5);
+  const idleInRange = [idleMotion1, idleMotion2, idleMotion3].every(m => m.breathe >= -0.012 - 1e-9 && m.breathe <= 0.012 + 1e-9);
+  assert(idleInRange, "phase 'idle': breathe nằm trong [-0.012, 0.012]");
+
+  // 4c. phase 'seated': breathe nằm trong [-0.008, 0.008] và seatOffsetY > 0
+  const seatedMotion1 = computeMotion({ phase: 'seated' }, 0);
+  const seatedMotion2 = computeMotion({ phase: 'seated' }, 2.5);
+  const seatedInRange = [seatedMotion1, seatedMotion2].every(m => m.breathe >= -0.008 - 1e-9 && m.breathe <= 0.008 + 1e-9);
+  assert(seatedInRange && seatedMotion1.seatOffsetY > 0, "phase 'seated': breathe nằm trong [-0.008, 0.008] và seatOffsetY > 0");
+
+  // 4d. phase 'walk_in': tilt có thể khác 0, và bob luôn >= 0
+  const walkSteps = [0.2, 0.7, 1.5, 2.3, 3.14, 4.5];
+  const walkMotions = walkSteps.map(wp => computeMotion({ phase: 'walk_in', walkPhase: wp }, 0));
+  const hasNonZeroTilt = walkMotions.some(m => Math.abs(m.tilt) > 0.001);
+  const allBobNonNegative = walkMotions.every(m => m.bob >= 0);
+  assert(hasNonZeroTilt && allBobNonNegative, "phase 'walk_in': tilt có thể khác 0, và bob luôn >= 0");
+
+  // 4e. phase 'receive' và 'walk_out' không lỗi khi loc.walkPhase undefined
+  let noErrorWalkOutReceive = false;
+  try {
+    const mWalkOut = computeMotion({ phase: 'walk_out' }, 1.0);
+    const mReceive = computeMotion({ phase: 'receive' }, 1.0);
+    noErrorWalkOutReceive = !isNaN(mWalkOut.bob) && !isNaN(mReceive.bob);
+  } catch (err) {
+    noErrorWalkOutReceive = false;
+  }
+  assert(noErrorWalkOutReceive, "phase 'receive' và 'walk_out' không lỗi khi loc.walkPhase undefined");
+
   console.log('\n====================================================');
   console.log(`KẾT QUẢ TỔNG CỘNG: ${passed} PASS, ${failed} FAIL`);
   console.log('====================================================');

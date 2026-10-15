@@ -718,10 +718,47 @@ class SpriteClipPlayer {
   }
 }
 
+function computeCustomerMotion(loc, simTime = 0, scale = 1.0) {
+  let bob = 0;
+  let tilt = 0;
+  let seatOffsetY = 0;
+  let breathe = 0;
+
+  if (!loc) {
+    return { bob, tilt, seatOffsetY, breathe };
+  }
+
+  if (loc.phase === 'walk_in' || loc.phase === 'walk_out') {
+    const stepAngle = loc.walkPhase || 0;
+    const sway = Math.sin(stepAngle * 2) * 0.03;
+    bob = Math.abs(Math.sin(stepAngle)) * (5.5 * scale);
+    tilt = Math.sin(stepAngle) * 0.04 + sway;
+  } else if (loc.phase === 'idle') {
+    bob = Math.sin(simTime * 3.6) * (1.8 * scale);
+    tilt = 0;
+    breathe = Math.sin(simTime * 2.4) * 0.012;
+  } else if (loc.phase === 'seated') {
+    bob = Math.sin(simTime * 2.8) * (1.2 * scale);
+    tilt = 0;
+    seatOffsetY = 7 * scale;
+    breathe = Math.sin(simTime * 2.0) * 0.008;
+  } else if (loc.phase === 'receive') {
+    const rTimer = loc.receiveTimer || 0;
+    bob = Math.sin(rTimer * 15) * (6 * scale);
+    tilt = 0;
+    if (loc.pose === 'sit') {
+      seatOffsetY = 7 * scale;
+    }
+  }
+
+  return { bob, tilt, seatOffsetY, breathe };
+}
+
 // Expose globally for testing/debugging
 if (typeof window !== 'undefined') {
   window.loadSpriteAtlas = loadSpriteAtlas;
   window.SpriteClipPlayer = SpriteClipPlayer;
+  window.computeCustomerMotion = computeCustomerMotion;
 }
 
 // --- 3. ADVANCED PIXEL SCENE RENDERER (AGENT SPRITE FORGE ENGINE) ---
@@ -1400,33 +1437,8 @@ class PixelSceneRenderer {
     const cw = baseW * scale;
     const ch = baseH * scale;
 
-    let bob = 0;
-    let tilt = 0;
-    let seatOffsetY = 0;
-    let breathe = 0;
+    const { bob, tilt, seatOffsetY, breathe } = computeCustomerMotion(loc, this.simTime, scale);
     const isSeated = (loc.phase === 'seated' || (loc.phase === 'receive' && loc.pose === 'sit'));
-
-    if (loc.phase === 'walk_in' || loc.phase === 'walk_out') {
-      const stepAngle = loc.walkPhase;
-      const sway = Math.sin(stepAngle * 2) * 0.03;
-      bob = Math.abs(Math.sin(stepAngle)) * (5.5 * scale);
-      tilt = Math.sin(stepAngle) * 0.04 + sway;
-    } else if (loc.phase === 'idle') {
-      bob = Math.sin(this.simTime * 3.6) * (1.8 * scale);
-      tilt = 0;
-      breathe = Math.sin(this.simTime * 2.4) * 0.012;
-    } else if (loc.phase === 'seated') {
-      bob = Math.sin(this.simTime * 2.8) * (1.2 * scale);
-      tilt = 0;
-      seatOffsetY = 7 * scale;
-      breathe = Math.sin(this.simTime * 2.0) * 0.008;
-    } else if (loc.phase === 'receive') {
-      bob = Math.sin(loc.receiveTimer * 15) * (6 * scale);
-      tilt = 0;
-      if (loc.pose === 'sit') {
-        seatOffsetY = 7 * scale;
-      }
-    }
 
     const footX = loc.x;
     const footY = loc.y;
