@@ -1397,19 +1397,23 @@ class PixelSceneRenderer {
     let bob = 0;
     let tilt = 0;
     let seatOffsetY = 0;
+    let breathe = 0;
     const isSeated = (loc.phase === 'seated' || (loc.phase === 'receive' && loc.pose === 'sit'));
 
     if (loc.phase === 'walk_in' || loc.phase === 'walk_out') {
       const stepAngle = loc.walkPhase;
+      const sway = Math.sin(stepAngle * 2) * 0.03;
       bob = Math.abs(Math.sin(stepAngle)) * (5.5 * scale);
-      tilt = Math.sin(stepAngle) * 0.04;
+      tilt = Math.sin(stepAngle) * 0.04 + sway;
     } else if (loc.phase === 'idle') {
       bob = Math.sin(this.simTime * 3.6) * (1.8 * scale);
       tilt = 0;
+      breathe = Math.sin(this.simTime * 2.4) * 0.012;
     } else if (loc.phase === 'seated') {
       bob = Math.sin(this.simTime * 2.8) * (1.2 * scale);
       tilt = 0;
       seatOffsetY = 7 * scale;
+      breathe = Math.sin(this.simTime * 2.0) * 0.008;
     } else if (loc.phase === 'receive') {
       bob = Math.sin(loc.receiveTimer * 15) * (6 * scale);
       tilt = 0;
@@ -1447,6 +1451,7 @@ class PixelSceneRenderer {
       ctx.scale(-1, 1);
     }
     ctx.rotate(tilt);
+    ctx.scale(1 + breathe * 0.5, 1 - breathe);
 
     if (isSeated) {
       ctx.save();
