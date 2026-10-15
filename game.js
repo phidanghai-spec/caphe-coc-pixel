@@ -2653,12 +2653,23 @@ class GameController {
         setTimeout(() => this.showToast('📖 Chương 2: Hoa & Lâm bắt đầu dự án khởi nghiệp!'), 650);
       } else if (choice.effects.vinh_wave && !this.story.flags.vinh_wave) {
         setTimeout(() => this.showToast('📖 Chương 2: Chuyện chiếc Wave cũ của chú Vinh!'), 650);
+      } else if (choice.effects.lan_hoi_am && !this.story.flags.lan_hoi_am) {
+        setTimeout(() => this.showToast('📖 Chương 3: Lá thư hồi âm từ cô Lan!'), 650);
+      } else if (choice.effects.ba_nhan_thu && !this.story.flags.ba_nhan_thu) {
+        setTimeout(() => this.showToast('📖 Chương 3: Bác Ba nhận được thư hồi âm!'), 650);
+      } else if (choice.effects.app_ra_mat && !this.story.flags.app_ra_mat) {
+        setTimeout(() => this.showToast('📖 Chương 3: App của Hoa & Lâm ra mắt!'), 650);
+      } else if (choice.effects.vinh_chup_anh && !this.story.flags.vinh_chup_anh) {
+        setTimeout(() => this.showToast('📖 Chương 3: Tấm ảnh cuối với chiếc Wave!'), 650);
       }
     }
 
     const event = this.story.applyEffects(choice.effects);
     if (event === 'ending') {
       this.triggerEnding();
+    }
+    if (event === 'chuong3') {
+      this.showToast('🏁 Chương 3 hoàn thành: Những lá thư đã đến tay người nhận!');
     }
   }
 

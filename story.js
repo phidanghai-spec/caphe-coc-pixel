@@ -12,7 +12,12 @@ const STORY_DEFAULT_FLAGS = {
   ba_lan_thu: false,
   ba_lan_gap_lai: false,
   vinh_wave: false,
-  lam_hoa_startup: false
+  lam_hoa_startup: false,
+  lan_hoi_am: false,
+  ba_nhan_thu: false,
+  app_ra_mat: false,
+  vinh_chup_anh: false,
+  chuong3_xong: false
 };
 
 // Mỗi dòng có thể có "when" (điều kiện theo cờ). Dòng đầu tiên khớp sẽ được dùng,
@@ -20,6 +25,8 @@ const STORY_DEFAULT_FLAGS = {
 const STORY_SCENES = {
   night: {
     arrive: [
+      { when: f => f.vinh_wave && !f.vinh_chup_anh,
+        text: 'Tuần sau chú đem chiếc Wave đi sửa lần cuối đó con. Chú muốn chụp với nó một tấm hình kỷ niệm, con đứng chụp giùm chú nghen.' },
       { when: f => f.ket_thuc && !f.vinh_wave,
         text: 'Con biết không, chiếc Wave này chú chạy từ hồi con còn nhỏ. Nó nuôi hai đứa con học đại học đó.' },
       { when: f => f.o_vang_dang_tin && !f.o_vang_o_quan,
@@ -29,6 +36,10 @@ const STORY_SCENES = {
       { text: 'Cho chú ly cà phê sữa đá nhiều sữa nghen con. Chạy cuốc cuối đêm mưa ướt sũng cả áo rồi... Hồi chiều chú chở một cô gái, xuống xe chú mới thấy cái ô vàng quên trên xe luôn á.' }
     ],
     choices: [
+      { text: 'Con chụp với chú và chiếc Wave nha!',
+        when: f => f.vinh_wave && !f.vinh_chup_anh,
+        reply: 'Ừ, chú in một tấm gửi tụi nhỏ, nói là chiếc xe đã nuôi tụi nó học.',
+        bonusHearts: 3, effects: { vinh_chup_anh: true } },
       { text: 'Chú kể con nghe về chiếc xe đi.',
         when: f => f.ket_thuc && !f.vinh_wave,
         reply: 'Mỗi cuốc xe là một tiền học phí. Hai đứa nó tốt nghiệp rồi, giờ chú chỉ mong xe chạy thêm vài năm nữa.',
@@ -46,6 +57,8 @@ const STORY_SCENES = {
         bonusHearts: 2 }
     ],
     serve: [
+      { when: f => f.vinh_chup_anh,
+        text: 'Cà phê sữa đá hôm nay mát lạnh. Cảm ơn con đã đứng chụp với chú nha!' },
       { when: f => f.o_vang_o_quan,
         text: 'Cà phê thơm béo, bánh mì giòn tan. Con giữ ô giùm chú, chú cảm ơn con nhiều nghen!' }
     ]
@@ -80,6 +93,8 @@ const STORY_SCENES = {
 
   indoor: {
     arrive: [
+      { when: f => f.lam_hoa_startup && !f.app_ra_mat,
+        text: 'Anh Lâm ơi, bản prototype chạy được rồi! Hoa vẽ xong màn hình đặt chỗ, anh xem giúp em luồng đặt chỗ coi ổn không.' },
       { when: f => f.ket_thuc && !f.lam_hoa_startup,
         text: 'Hoa với anh đang bàn chuyện làm app từ đồ án tốt nghiệp đó em. Em kể thử xem, ý tưởng của em tới đâu rồi?' },
       { when: f => f.o_vang_dang_tin && !f.lam_ho_tro,
@@ -87,6 +102,10 @@ const STORY_SCENES = {
       { text: 'Làm cho anh ly Cà Phê Muối béo mặn xứ Huế nha em. Kèm lát bánh Tiramisu phô mai, bug server dí từ sáng, cần sốc lại tinh thần...' }
     ],
     choices: [
+      { text: 'Anh xem rồi, luồng chạy mượt lắm. Ra mắt thôi em!',
+        when: f => f.lam_hoa_startup && !f.app_ra_mat,
+        reply: 'Yes! Tối nay mình đăng lên nhóm sinh viên luôn nha.',
+        bonusHearts: 3, effects: { app_ra_mat: true } },
       { text: 'Hai bạn làm chung app đi, anh có kinh nghiệm backend em lo phần giao diện.',
         when: f => f.ket_thuc && !f.lam_hoa_startup,
         reply: 'Vậy là chốt nha! Mình bắt đầu từ bản prototype tuần này.',
@@ -103,6 +122,8 @@ const STORY_SCENES = {
         bonusHearts: 2 }
     ],
     serve: [
+      { when: f => f.app_ra_mat,
+        text: 'Ly cà phê muối mừng app ra mắt đây, Tiramisu dành cho người làm ra app nha!' },
       { when: f => f.lam_ho_tro,
         text: 'Lớp kem muối béo ngậy, bánh tiramisu đỉnh chóp. Cảm ơn em đã giúp anh ghim bài nha, đúng lúc quá!' }
     ]
@@ -110,11 +131,17 @@ const STORY_SCENES = {
 
   morning: {
     arrive: [
+      { when: f => f.lan_hoi_am && !f.ba_nhan_thu,
+        text: 'Con về rồi hả? Có tin gì của cô Lan không con?' },
       { when: f => f.ket_thuc && !f.ba_lan_thu,
         text: 'Sáng nay bác tới sớm hơn mọi hôm, ngồi xuống đi con. Bác đang dở ván cờ với mấy ông bạn già.' },
       { text: 'Cho bác ly Cà Phê Đen Đá đậm đà không đường con nhé. Kèm ổ bánh mì pa-tê giòn rụm, sáng ra làm ván cờ với mấy ông bạn già là thú vui tao nhã...' }
     ],
     choices: [
+      { text: 'Dạ có ạ, cô Lan gửi thư hồi âm cho bác. Con đưa bác nè.',
+        when: f => f.lan_hoi_am && !f.ba_nhan_thu,
+        reply: 'Trời ơi... bác đọc chậm thôi nghen. Cảm ơn con đã đi xa giùm bác.',
+        bonusHearts: 4, effects: { ba_nhan_thu: true } },
       { text: 'Bác ơi, cuốn sổ cờ tướng của bác kẹp cái gì vậy?',
         when: f => f.ket_thuc && !f.ba_lan_thu,
         reply: 'Ừ... là bức thư cũ của cô Lan. Bác giữ hơn ba chục năm rồi, chuyến xe bus Hà Nội – Hội An năm đó, bác chưa kịp nói.',
@@ -141,6 +168,8 @@ const STORY_SCENES = {
         bonusHearts: 3 }
     ],
     serve: [
+      { when: f => f.ba_nhan_thu,
+        text: 'Cà phê hôm nay đắng hơn mọi hôm mà ngọt trong lòng quá. Bác cảm ơn con nhiều nghen!' },
       { when: f => f.ba_gui_qua,
         text: 'Cà phê đậm vị, đắng thanh hậu ngọt. Bánh mì nóng giòn. Đừng quên gói quà cho cô Lan nghen con!' }
     ]
@@ -148,11 +177,17 @@ const STORY_SCENES = {
 
   hoian: {
     arrive: [
+      { when: f => f.ba_lan_gap_lai && !f.lan_hoi_am,
+        text: 'Con lại tới rồi hả con. Cô đọc thư ông ấy mấy lần rồi, tay run quá viết không nổi... Con chờ cô một chút nghen.' },
       { when: f => f.ba_gui_qua && !f.lan_biet_chuyen,
         text: 'Con ơi, con là người bác Ba nhờ đem quà cho cô hả? Cô nhớ ông ấy lắm, lâu quá rồi không gặp...' },
       { text: 'Pha cho cô ly Trà Mót thảo mộc thanh mát nha con ơi! Gánh hàng cả buổi chiều mệt nhoài, thêm đĩa bánh đập phố cổ chấm mắm nêm...' }
     ],
     choices: [
+      { text: 'Cô ơi, cô có lời nhắn nào gửi lại bác Ba không ạ?',
+        when: f => f.ba_lan_gap_lai && !f.lan_hoi_am,
+        reply: 'Có chứ con. Cô viết mấy dòng, con giao giùm ông ấy nha. Cảm ơn con nhiều.',
+        bonusHearts: 3, effects: { lan_hoi_am: true } },
       { text: 'Hôm nay cô bán buôn đắt hàng không cô?',
         reply: 'Nhờ trời thương cũng bán được mấy gánh hàng rong con ạ, cảm ơn con hỏi thăm nghen!',
         bonusHearts: 3 },
@@ -165,6 +200,8 @@ const STORY_SCENES = {
         bonusHearts: 4, effects: { lan_biet_chuyen: true } }
     ],
     serve: [
+      { when: f => f.lan_hoi_am,
+        text: 'Trà Mót hôm nay thêm chút mật ong. Thư hồi âm cô gửi con rồi, con đem về cho bác Ba nha!' },
       { when: f => f.lan_biet_chuyen,
         text: 'Trà sen thơm dịu, bánh đập giòn bùi chấm mắm. Con về nói với bác Ba là cô cảm ơn ông ấy nhiều nghen!' }
     ]
@@ -210,6 +247,11 @@ class StoryManager {
     if (!this.flags.ket_thuc && this.flags.hoa_da_gap_o && this.flags.lan_biet_chuyen) {
       this.flags.ket_thuc = true;
       return 'ending';
+    }
+    if (!this.flags.chuong3_xong && this.flags.lan_hoi_am && this.flags.ba_nhan_thu
+        && this.flags.app_ra_mat && this.flags.vinh_chup_anh) {
+      this.flags.chuong3_xong = true;
+      return 'chuong3';
     }
     return null;
   }
