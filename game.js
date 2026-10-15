@@ -921,6 +921,8 @@ class PixelSceneRenderer {
     loc.receiveTimer = 0;
     loc.receiveStage = null;
     loc.hurry = false;
+    loc.greetAt = null;
+    loc.shakeAt = null;
     loc.onDepartCallback = oldDepartCallback;
 
     this.computeCustomerPositionAlongPath(loc);
@@ -971,6 +973,7 @@ class PixelSceneRenderer {
     loc.drinkEmoji = emoji || '☕';
     loc.receiveTimer = 0;
     loc.receiveStage = null;
+    loc.shakeAt = this.simTime;
 
     const spriteKey = (this.currentSceneCfg && this.currentSceneCfg.customer && this.currentSceneCfg.customer.spriteKey) || 'vinh';
     const player = this.getClipPlayer(spriteKey);
@@ -1191,6 +1194,9 @@ class PixelSceneRenderer {
         const isSit = loc.route && loc.route.seat && loc.route.seat.pose === 'sit';
         loc.phase = isSit ? 'seated' : 'idle';
         loc.pose = isSit ? 'sit' : 'stand';
+        if (loc.greetAt == null) {
+          loc.greetAt = this.simTime;
+        }
       }
       this.computeCustomerPositionAlongPath(loc);
       if (player) {
@@ -1424,7 +1430,12 @@ class PixelSceneRenderer {
 
     const footX = loc.x;
     const footY = loc.y;
-    const spriteCenterX = footX;
+    let shakeX = 0;
+    if (loc.shakeAt != null && (this.simTime - loc.shakeAt) < 0.4) {
+      const decay = 1 - (this.simTime - loc.shakeAt) / 0.4;
+      shakeX = Math.sin((this.simTime - loc.shakeAt) * 60) * 2.5 * scale * decay;
+    }
+    const spriteCenterX = footX + shakeX;
     const spriteCenterY = footY - (ch / 2) - bob + seatOffsetY;
 
     ctx.save();
@@ -1476,6 +1487,14 @@ class PixelSceneRenderer {
       ctx.font = '16px serif';
       ctx.fillText('💖', -15 + Math.sin(this.simTime * 6) * 6, -ch / 2 - 12);
       ctx.fillText('✨', 12, -ch / 2 - 18);
+    }
+
+    if (loc.greetAt != null && (this.simTime - loc.greetAt) < 1.8) {
+      const alpha = 1 - (this.simTime - loc.greetAt) / 1.8;
+      ctx.globalAlpha = alpha;
+      ctx.font = `${Math.round(16 * scale)}px serif`;
+      ctx.fillText('👋', cw / 2 - 4 * scale, -ch / 2 - 6 * scale);
+      ctx.globalAlpha = 1;
     }
 
     ctx.restore();
