@@ -2,57 +2,205 @@
 // CÀ PHÊ CÓC VỈA HÈ - COZY PIXEL ENGINE (TUẦN 1 HOÀN THIỆN)
 // ==========================================
 
+function computeMasterGain(muted, volume) {
+  if (muted) return 0;
+  const v = typeof volume === 'number' ? volume : 1;
+  if (isNaN(v)) return 0;
+  return Math.max(0, Math.min(1, v));
+}
+
+function computeFadeGain(startTime, now, duration, from, to) {
+  if (now <= startTime) return from;
+  if (duration <= 0 || now >= startTime + duration) return to;
+  const progress = (now - startTime) / duration;
+  return from + (to - from) * progress;
+}
+
+const AUDIO_GAINS = {
+  AMBIENT: 0.08,
+  DIALOGUE: 0.02,
+  EVENT: 0.12,
+  INTERACT: 0.10
+};
+const AMBIENT_GAIN = AUDIO_GAINS.AMBIENT;
+const DIALOGUE_GAIN = AUDIO_GAINS.DIALOGUE;
+const EVENT_GAIN = AUDIO_GAINS.EVENT;
+const INTERACT_GAIN = AUDIO_GAINS.INTERACT;
+
+if (typeof window !== 'undefined') {
+  window.computeMasterGain = computeMasterGain;
+  window.computeFadeGain = computeFadeGain;
+  window.AUDIO_GAINS = AUDIO_GAINS;
+  window.AMBIENT_GAIN = AMBIENT_GAIN;
+  window.DIALOGUE_GAIN = DIALOGUE_GAIN;
+  window.EVENT_GAIN = EVENT_GAIN;
+  window.INTERACT_GAIN = INTERACT_GAIN;
+}
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports.computeMasterGain = computeMasterGain;
+  module.exports.computeFadeGain = computeFadeGain;
+  module.exports.AUDIO_GAINS = AUDIO_GAINS;
+  module.exports.AMBIENT_GAIN = AMBIENT_GAIN;
+  module.exports.DIALOGUE_GAIN = DIALOGUE_GAIN;
+  module.exports.EVENT_GAIN = EVENT_GAIN;
+  module.exports.INTERACT_GAIN = INTERACT_GAIN;
+}
+
 // --- 1. PROCEDURAL SOUND ENGINE (Web Audio API) ---
 class SoundEngine {
   constructor() {
     this.ctx = null;
+    this.masterGain = null;
+    this.isMuted = false;
+    this.masterVolume = 1.0;
     this.rainGain = null;
     this.ambientType = 'rain'; // 'rain', 'birds', 'river'
     this.isAmbientPlaying = false;
     this.isLofiPlaying = false;
     this.lofiInterval = null;
     this.ambientSource = null;
+    this.ambientGainNode = null;
+    this.ambientNodes = [];
+    this.lofiNodes = [];
   }
 
   init() {
     if (!this.ctx) {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      this.ctx = new AudioContext();
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) {
+          this.ctx = new AudioContext();
+        }
+      } catch (_) {}
     }
-    if (this.ctx.state === 'suspended') {
-      this.ctx.resume();
+    if (this.ctx && !this.masterGain) {
+      try {
+        this.masterGain = this.ctx.createGain();
+        const initialGain = computeMasterGain(this.isMuted, this.masterVolume);
+        this.masterGain.gain.setValueAtTime(initialGain, this.ctx.currentTime || 0);
+        this.masterGain.connect(this.ctx.destination);
+      } catch (_) {}
+    }
+    if (this.ctx && this.ctx.state === 'suspended') {
+      try {
+        const p = this.ctx.resume();
+        if (p && typeof p.catch === 'function') {
+          p.catch(() => {});
+        }
+      } catch (_) {}
     }
   }
 
+  getMasterOutput() {
+    this.init();
+    return this.masterGain || (this.ctx ? this.ctx.destination : null);
+  }
+
+  setMuted(muted) {
+    this.isMuted = !!muted;
+    if (this.masterGain && this.ctx) {
+      const target = computeMasterGain(this.isMuted, this.masterVolume);
+      this.masterGain.gain.setValueAtTime(target, this.ctx.currentTime);
+    }
+  }
+
+  toggleMute() {
+    this.setMuted(!this.isMuted);
+    return this.isMuted;
+  }
+
   setAmbientTheme(theme) {
+    if (this.ambientType === theme) return;
     this.ambientType = theme;
-    if (this.isAmbientPlaying) {
+
+    if (!this.isAmbientPlaying) return;
+
+    // Crossfade 600ms
+    const fadeDuration = 0.6;
+    if (this.ctx && this.ambientGainNode) {
+      const now = this.ctx.currentTime;
+      const oldGain = this.ambientGainNode;
+      const oldSource = this.ambientSource;
+      const oldTimer = this.ambientTimer;
+      const oldNodes = this.ambientNodes || [];
+
+      if (oldGain && oldGain.gain) {
+        try {
+          oldGain.gain.cancelScheduledValues(now);
+          oldGain.gain.setValueAtTime(oldGain.gain.value, now);
+          oldGain.gain.linearRampToValueAtTime(0, now + fadeDuration);
+        } catch (_) {}
+      }
+
+      if (oldTimer) {
+        clearInterval(oldTimer);
+      }
+
+      setTimeout(() => {
+        if (oldSource) {
+          try { oldSource.stop(); } catch (_) {}
+          try { oldSource.disconnect(); } catch (_) {}
+        }
+        if (oldGain) {
+          try { oldGain.disconnect(); } catch (_) {}
+        }
+        oldNodes.forEach(node => {
+          try { if (node.stop) node.stop(); } catch (_) {}
+          try { if (node.disconnect) node.disconnect(); } catch (_) {}
+        });
+      }, fadeDuration * 1000 + 50);
+
+      this.ambientGainNode = null;
+      this.ambientSource = null;
+      this.ambientTimer = null;
+      this.ambientNodes = [];
+      this.isAmbientPlaying = false;
+      this.startAmbient(fadeDuration);
+    } else {
       this.stopAmbient();
       this.startAmbient();
     }
   }
 
-  startAmbient() {
+  startAmbient(fadeDuration = 0) {
     this.init();
     if (this.isAmbientPlaying) return;
 
     if (this.ambientType === 'morning') {
-      this.startBirdsAmbient();
+      this.startBirdsAmbient(fadeDuration);
     } else if (this.ambientType === 'hoian') {
-      this.startRiverAmbient();
+      this.startRiverAmbient(fadeDuration);
     } else if (this.ambientType === 'counter' || this.ambientType === 'indoor') {
-      this.startCafeIndoorAmbient();
+      this.startCafeIndoorAmbient(fadeDuration);
     } else {
-      this.startRainAmbient();
+      this.startRainAmbient(fadeDuration);
     }
     this.isAmbientPlaying = true;
   }
 
   stopAmbient() {
+    if (this.ambientGainNode && this.ctx) {
+      try {
+        const now = this.ctx.currentTime;
+        this.ambientGainNode.gain.cancelScheduledValues(now);
+        this.ambientGainNode.gain.setValueAtTime(0, now);
+      } catch (_) {}
+    }
     if (this.ambientSource) {
       try { this.ambientSource.stop(); } catch(e){}
-      this.ambientSource.disconnect();
+      try { this.ambientSource.disconnect(); } catch(e){}
       this.ambientSource = null;
+    }
+    if (this.ambientGainNode) {
+      try { this.ambientGainNode.disconnect(); } catch(e){}
+      this.ambientGainNode = null;
+    }
+    if (this.ambientNodes && this.ambientNodes.length) {
+      this.ambientNodes.forEach(node => {
+        try { if (node.stop) node.stop(); } catch (_) {}
+        try { if (node.disconnect) node.disconnect(); } catch (_) {}
+      });
+      this.ambientNodes = [];
     }
     if (this.ambientTimer) {
       clearInterval(this.ambientTimer);
@@ -62,7 +210,7 @@ class SoundEngine {
   }
 
   // Realistic Procedural Rain (Pink Noise)
-  startRainAmbient() {
+  startRainAmbient(fadeDuration = 0) {
     const bufferSize = this.ctx.sampleRate * 2;
     const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
     const output = noiseBuffer.getChannelData(0);
@@ -89,31 +237,39 @@ class SoundEngine {
     filter.frequency.value = 900;
 
     const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.18, this.ctx.currentTime);
+    const targetGain = AMBIENT_GAIN;
+    if (fadeDuration > 0) {
+      gain.gain.setValueAtTime(0, this.ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(targetGain, this.ctx.currentTime + fadeDuration);
+    } else {
+      gain.gain.setValueAtTime(targetGain, this.ctx.currentTime);
+    }
 
     whiteNoise.connect(filter);
     filter.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getMasterOutput());
     whiteNoise.start();
 
     this.ambientSource = whiteNoise;
+    this.ambientGainNode = gain;
+    this.ambientNodes = [whiteNoise, filter, gain];
   }
 
-  startBirdsAmbient() {
+  startBirdsAmbient(fadeDuration = 0) {
     // Gentle morning breeze + occasional chirp
-    this.startRainAmbient(); // use soft wind base
+    this.startRainAmbient(fadeDuration); // use soft wind base
     this.ambientTimer = setInterval(() => {
       if (!this.isAmbientPlaying) return;
       this.playChirp();
     }, 3500);
   }
 
-  startRiverAmbient() {
+  startRiverAmbient(fadeDuration = 0) {
     // Soft water lapping
-    this.startRainAmbient();
+    this.startRainAmbient(fadeDuration);
   }
 
-  startCafeIndoorAmbient() {
+  startCafeIndoorAmbient(fadeDuration = 0) {
     // Warm indoor cafe atmosphere: filtered pink noise + occasional gentle cup/spoon tinks
     const bufferSize = this.ctx.sampleRate * 2;
     const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
@@ -128,12 +284,20 @@ class SoundEngine {
     filter.type = 'lowpass';
     filter.frequency.value = 450;
     const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+    const targetGain = AMBIENT_GAIN * 0.75;
+    if (fadeDuration > 0) {
+      gain.gain.setValueAtTime(0, this.ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(targetGain, this.ctx.currentTime + fadeDuration);
+    } else {
+      gain.gain.setValueAtTime(targetGain, this.ctx.currentTime);
+    }
     noise.connect(filter);
     filter.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getMasterOutput());
     noise.start();
     this.ambientSource = noise;
+    this.ambientGainNode = gain;
+    this.ambientNodes = [noise, filter, gain];
 
     this.ambientTimer = setInterval(() => {
       if (!this.isAmbientPlaying) return;
@@ -149,10 +313,10 @@ class SoundEngine {
     const gain = this.ctx.createGain();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(1900 + Math.random() * 500, now);
-    gain.gain.setValueAtTime(0.02, now);
+    gain.gain.setValueAtTime(INTERACT_GAIN * 0.3, now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getMasterOutput());
     osc.start(now);
     osc.stop(now + 0.4);
   }
@@ -166,11 +330,11 @@ class SoundEngine {
     osc.frequency.exponentialRampToValueAtTime(3200, now + 0.08);
     osc.frequency.exponentialRampToValueAtTime(2600, now + 0.15);
 
-    gain.gain.setValueAtTime(0.04, now);
+    gain.gain.setValueAtTime(INTERACT_GAIN * 0.4, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
 
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getMasterOutput());
     osc.start(now);
     osc.stop(now + 0.2);
   }
@@ -207,12 +371,19 @@ class SoundEngine {
 
         const now = this.ctx.currentTime;
         gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(0.04, now + 0.8);
+        gain.gain.linearRampToValueAtTime(AMBIENT_GAIN * 0.5, now + 0.8);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 3.8);
 
         osc.connect(filter);
         filter.connect(gain);
-        gain.connect(this.ctx.destination);
+        gain.connect(this.getMasterOutput());
+
+        this.lofiNodes.push(osc, filter, gain);
+        setTimeout(() => {
+          if (this.lofiNodes) {
+            this.lofiNodes = this.lofiNodes.filter(n => n !== osc && n !== filter && n !== gain);
+          }
+        }, 4100);
 
         osc.start(now);
         osc.stop(now + 4);
@@ -229,6 +400,13 @@ class SoundEngine {
       clearInterval(this.lofiInterval);
       this.lofiInterval = null;
     }
+    if (this.lofiNodes && this.lofiNodes.length) {
+      this.lofiNodes.forEach(node => {
+        try { if (node && typeof node.stop === 'function') node.stop(); } catch (_) {}
+        try { if (node && typeof node.disconnect === 'function') node.disconnect(); } catch (_) {}
+      });
+      this.lofiNodes = [];
+    }
   }
 
   // Phin Drop Sound (tách... tách...)
@@ -242,11 +420,11 @@ class SoundEngine {
     osc.frequency.setValueAtTime(950, now);
     osc.frequency.exponentialRampToValueAtTime(450, now + 0.08);
 
-    gain.gain.setValueAtTime(0.14, now);
+    gain.gain.setValueAtTime(INTERACT_GAIN * 1.2, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
 
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getMasterOutput());
     osc.start(now);
     osc.stop(now + 0.1);
   }
@@ -262,11 +440,11 @@ class SoundEngine {
     osc.frequency.setValueAtTime(400 + Math.random() * 200, now);
     osc.frequency.exponentialRampToValueAtTime(200, now + 0.06);
 
-    gain.gain.setValueAtTime(0.1, now);
+    gain.gain.setValueAtTime(INTERACT_GAIN, now);
     gain.gain.exponentialRampToValueAtTime(0.01, now + 0.06);
 
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getMasterOutput());
     osc.start(now);
     osc.stop(now + 0.07);
   }
@@ -281,11 +459,11 @@ class SoundEngine {
     osc.frequency.setValueAtTime(type === 'coffee' ? 240 : 420, now);
     osc.frequency.exponentialRampToValueAtTime(120, now + 0.35);
 
-    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.setValueAtTime(INTERACT_GAIN * 1.1, now);
     gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
 
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getMasterOutput());
     osc.start(now);
     osc.stop(now + 0.4);
   }
@@ -299,11 +477,11 @@ class SoundEngine {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq + Math.random() * 80, now + idx * 0.05);
 
-      gain.gain.setValueAtTime(0.1, now + idx * 0.05);
+      gain.gain.setValueAtTime(INTERACT_GAIN, now + idx * 0.05);
       gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.05 + 0.15);
 
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getMasterOutput());
       osc.start(now + idx * 0.05);
       osc.stop(now + idx * 0.05 + 0.2);
     });
@@ -318,11 +496,11 @@ class SoundEngine {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(800 + (i % 2) * 300, now + i * 0.1);
 
-      gain.gain.setValueAtTime(0.06, now + i * 0.1);
+      gain.gain.setValueAtTime(INTERACT_GAIN * 0.7, now + i * 0.1);
       gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 0.08);
 
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getMasterOutput());
       osc.start(now + i * 0.1);
       osc.stop(now + i * 0.1 + 0.1);
     }
@@ -337,11 +515,11 @@ class SoundEngine {
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(f, now + idx * 0.09);
 
-      gain.gain.setValueAtTime(0.1, now + idx * 0.09);
+      gain.gain.setValueAtTime(EVENT_GAIN, now + idx * 0.09);
       gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.09 + 0.3);
 
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getMasterOutput());
       osc.start(now + idx * 0.09);
       osc.stop(now + idx * 0.09 + 0.35);
     });
@@ -354,10 +532,10 @@ class SoundEngine {
     const gain = this.ctx.createGain();
     osc.type = 'triangle';
     osc.frequency.setValueAtTime(650 + Math.random() * 200, now);
-    gain.gain.setValueAtTime(0.012, now);
+    gain.gain.setValueAtTime(DIALOGUE_GAIN, now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.035);
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getMasterOutput());
     osc.start(now);
     osc.stop(now + 0.04);
   }
@@ -372,10 +550,10 @@ class SoundEngine {
     osc.frequency.exponentialRampToValueAtTime(820, now + 0.15);
     osc.frequency.exponentialRampToValueAtTime(520, now + 0.45);
     gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.09, now + 0.05);
+    gain.gain.linearRampToValueAtTime(INTERACT_GAIN * 0.9, now + 0.05);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getMasterOutput());
     osc.start(now);
     osc.stop(now + 0.55);
   }
@@ -388,10 +566,10 @@ class SoundEngine {
     osc.type = 'square';
     osc.frequency.setValueAtTime(1400, now);
     osc.frequency.setValueAtTime(750, now + 0.06);
-    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.setValueAtTime(EVENT_GAIN, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getMasterOutput());
     osc.start(now);
     osc.stop(now + 0.15);
   }
@@ -404,14 +582,21 @@ class SoundEngine {
       const gain = this.ctx.createGain();
       osc.type = 'sine';
       osc.frequency.setValueAtTime(f, now + idx * 0.08);
-      gain.gain.setValueAtTime(0.08, now + idx * 0.08);
+      gain.gain.setValueAtTime(EVENT_GAIN * 0.75, now + idx * 0.08);
       gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.25);
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getMasterOutput());
       osc.start(now + idx * 0.08);
       osc.stop(now + idx * 0.08 + 0.3);
     });
   }
+}
+
+if (typeof window !== 'undefined') {
+  window.SoundEngine = SoundEngine;
+}
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports.SoundEngine = SoundEngine;
 }
 
 // --- 2. AGENT SPRITE FORGE: SPRITE ATLAS LOADER & CLIP PLAYER ---
@@ -2210,6 +2395,20 @@ class GameController {
     });
 
     // Audio toggles
+    const btnMute = document.getElementById('btn-toggle-mute');
+    if (btnMute) {
+      btnMute.addEventListener('click', () => {
+        const isMuted = this.sound.toggleMute();
+        if (isMuted) {
+          btnMute.classList.add('muted');
+          btnMute.innerHTML = '🔇 <span class="btn-text">Âm lượng: TẮT</span>';
+        } else {
+          btnMute.classList.remove('muted');
+          btnMute.innerHTML = '🔊 <span class="btn-text">Âm lượng: BẬT</span>';
+        }
+      });
+    }
+
     const btnAmbient = document.getElementById('btn-toggle-ambient');
     btnAmbient.addEventListener('click', () => {
       if (this.sound.isAmbientPlaying) {
@@ -2236,12 +2435,24 @@ class GameController {
       }
     });
 
-    // Auto-start audio on first user gesture
-    document.body.addEventListener('click', () => {
-      if (!this.sound.ctx) {
-        this.sound.startAmbient();
+    // Auto-start / resume audio on first user gesture
+    const unlockAudio = () => {
+      if (this.sound) {
+        this.sound.init();
+        if (this.sound.ctx && this.sound.ctx.state === 'suspended') {
+          try {
+            const p = this.sound.ctx.resume();
+            if (p && typeof p.catch === 'function') p.catch(() => {});
+          } catch (_) {}
+        }
+        if (!this.sound.isAmbientPlaying) {
+          this.sound.startAmbient();
+        }
       }
-    }, { once: true });
+    };
+    ['click', 'touchstart', 'pointerdown', 'keydown'].forEach(evt => {
+      window.addEventListener(evt, unlockAudio, { once: true, passive: true });
+    });
 
     // Shop Modal triggers
     document.getElementById('btn-open-shop').addEventListener('click', () => this.openShopModal());
