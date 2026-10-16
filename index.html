@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Silkscreen:wght@400;700&family=VT323&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
   <div class="app-container">
@@ -57,6 +57,8 @@
           <canvas id="cafe-canvas" width="640" height="360"></canvas>
           <div class="scanline-overlay"></div>
           <div class="weather-tag" id="weather-status">🌧️ Đêm Mưa Vỉa Hè (Phố Khuya)</div>
+          <!-- Notification Toast: góc dưới khung hình cảnh, phía trên khung hội thoại -->
+          <div id="toast" class="toast hidden"></div>
         </div>
         <button id="btn-quick-pet-cat" class="btn-canvas-cat" title="Vuốt ve chú mèo Miu Miu">
           🐾 Vuốt ve mèo Miu Miu
@@ -179,8 +181,8 @@
             <div class="dish-plate-wrapper" id="dish-plate-wrapper">
               <div class="plate-dish" id="plate-dish">
                 <div class="dish-icon" id="dish-icon">🥖</div>
-                <div class="dish-label" id="dish-label">Bánh Mì Giòn</div>
               </div>
+              <div class="dish-label" id="dish-label">Bánh Mì Giòn</div>
             </div>
           </div>
 
@@ -264,8 +266,7 @@
       </div>
     </div>
 
-    <!-- Notification Toast -->
-    <div id="toast" class="toast hidden"></div>
+    <!-- Notification Toast moved to .canvas-wrapper -->
   </div>
 
   <script src="story.js"></script>

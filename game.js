@@ -754,11 +754,39 @@ function computeCustomerMotion(loc, simTime = 0, scale = 1.0) {
   return { bob, tilt, seatOffsetY, breathe };
 }
 
+/**
+ * Pure function: getDrinkColor(drinkName)
+ * Bảng map tên món nước -> mã màu chất lỏng (HEX / RGBA) hiển thị trong ly.
+ * @param {string} drinkName - Tên món nước
+ * @returns {string} Mã màu CSS
+ */
+function getDrinkColor(drinkName) {
+  if (!drinkName || typeof drinkName !== 'string') return 'transparent';
+  const name = drinkName.toLowerCase();
+  if (name.includes('trống') || name === 'ly trống...') return 'transparent';
+  if (name.includes('muối')) return '#3d2314'; // Cà phê muối (nâu sẫm hòa quyện kem muối)
+  if (name.includes('trứng')) return '#f59e0b'; // Cà phê trứng (vàng óng kem trứng)
+  if (name.includes('đào') || name.includes('cam sả')) return '#ea580c'; // Trà đào cam sả (cam đào tươi)
+  if (name.includes('mót') || name.includes('sen') || name.includes('thảo mộc')) return '#d97706'; // Trà sen Mót Hội An (hổ phách thanh tao)
+  if (name.includes('sữa đá') || name.includes('bạc xỉu') || name.includes('sữa (đã khuấy)')) return '#a16207'; // Cà phê sữa / bạc xỉu (nâu caramel béo ngọt)
+  if (name.includes('sữa (chưa khuấy)')) return '#451a03'; // Cà phê sữa chưa khuấy (nâu đen phân tầng)
+  if (name.includes('sữa đặc')) return '#fffbeb'; // Sữa đặc nóng (trắng ngà ngọt dịu)
+  if (name.includes('đen')) return '#1a0f07'; // Cà phê đen phin (đen tuyền đắng thanh)
+  if (name.includes('trà')) return '#c27803'; // Trà lài / trà đá / trà gừng (vàng hổ phách)
+  if (name.includes('đá không')) return 'rgba(186, 230, 253, 0.7)'; // Ly đá mát lạnh
+  if (name.includes('cà phê')) return '#291508'; // Cà phê nói chung
+  return '#78350f'; // Màu nước uống mặc định
+}
+
 // Expose globally for testing/debugging
 if (typeof window !== 'undefined') {
   window.loadSpriteAtlas = loadSpriteAtlas;
   window.SpriteClipPlayer = SpriteClipPlayer;
   window.computeCustomerMotion = computeCustomerMotion;
+  window.getDrinkColor = getDrinkColor;
+}
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports.getDrinkColor = getDrinkColor;
 }
 
 // --- 3. ADVANCED PIXEL SCENE RENDERER (AGENT SPRITE FORGE ENGINE) ---
@@ -915,12 +943,22 @@ class PixelSceneRenderer {
   }
 
   resetCustomerLocomotion(sceneCfg) {
-    const route = (sceneCfg && sceneCfg.route) ? sceneCfg.route : {
-      entry: { x: -50, y: sceneCfg ? sceneCfg.targetY || 175 : 175, scale: 1.0 },
-      waypoints: [],
-      seat: { x: sceneCfg ? sceneCfg.targetX || 160 : 160, y: sceneCfg ? sceneCfg.targetY || 175 : 175, pose: 'stand' },
-      scaleNear: 1.0
-    };
+    let route = (sceneCfg && sceneCfg.route) ? { ...sceneCfg.route } : null;
+    if (!route) {
+      const entryPt = (sceneCfg && (sceneCfg.door || sceneCfg.bridge))
+        ? { ...(sceneCfg.door || sceneCfg.bridge) }
+        : { x: -50, y: sceneCfg ? sceneCfg.targetY || 175 : 175, scale: 1.0 };
+      route = {
+        entry: entryPt,
+        waypoints: [],
+        seat: { x: sceneCfg ? sceneCfg.targetX || 160 : 160, y: sceneCfg ? sceneCfg.targetY || 175 : 175, pose: 'stand' },
+        scaleNear: 1.0
+      };
+    } else if (sceneCfg && sceneCfg.door && (!route.entry || route.entry.x < 0)) {
+      route.entry = { ...sceneCfg.door };
+    } else if (sceneCfg && sceneCfg.bridge && (!route.entry || route.entry.x < 0)) {
+      route.entry = { ...sceneCfg.bridge };
+    }
 
     const pts = [route.entry, ...(route.waypoints || []), route.seat];
     const segments = [];
@@ -1434,38 +1472,39 @@ class PixelSceneRenderer {
     const scale = loc.scale || 1.0;
     const baseW = 60;
     const baseH = 108;
-    const cw = baseW * scale;
-    const ch = baseH * scale;
+    const cw = Math.round(baseW * scale);
+    const ch = Math.round(baseH * scale);
 
     const { bob, tilt, seatOffsetY, breathe } = computeCustomerMotion(loc, this.simTime, scale);
     const isSeated = (loc.phase === 'seated' || (loc.phase === 'receive' && loc.pose === 'sit'));
 
-    const footX = loc.x;
-    const footY = loc.y;
+    const footX = Math.round(loc.x);
+    const footY = Math.round(loc.y);
     let shakeX = 0;
     if (loc.shakeAt != null && (this.simTime - loc.shakeAt) < 0.4) {
       const decay = 1 - (this.simTime - loc.shakeAt) / 0.4;
       shakeX = Math.sin((this.simTime - loc.shakeAt) * 60) * 2.5 * scale * decay;
     }
-    const spriteCenterX = footX + shakeX;
-    const spriteCenterY = footY - (ch / 2) - bob + seatOffsetY;
+    const spriteCenterX = Math.round(footX + shakeX);
+    const spriteCenterY = Math.round(footY - (ch / 2) - bob + seatOffsetY);
 
     ctx.save();
+    ctx.globalAlpha = 1.0; // Đảm bảo nhân vật luôn rõ nét, không bị mờ đục hay mờ do lớp phủ
     ctx.imageSmoothingEnabled = false;
 
-    // Drop shadow
+    // Drop shadow under feet or stool
     if (!isSeated) {
       const shadowScale = (loc.phase === 'walk_in' || loc.phase === 'walk_out')
-        ? (1 + Math.sin(loc.walkPhase) * 0.2)
+        ? (1 + Math.sin(loc.walkPhase || 0) * 0.18)
         : 1;
       ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
       ctx.beginPath();
-      ctx.ellipse(footX, footY - (3 * scale), 20 * scale * shadowScale, 5 * scale, 0, 0, Math.PI * 2);
+      ctx.ellipse(footX, footY - Math.round(3 * scale), Math.round(18 * scale * shadowScale), Math.round(5 * scale), 0, 0, Math.PI * 2);
       ctx.fill();
     } else {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
       ctx.beginPath();
-      ctx.ellipse(footX, footY - (2 * scale), 18 * scale, 5 * scale, 0, 0, Math.PI * 2);
+      ctx.ellipse(footX, footY - Math.round(2 * scale), Math.round(16 * scale), Math.round(5 * scale), 0, 0, Math.PI * 2);
       ctx.fill();
     }
 
@@ -1476,16 +1515,25 @@ class PixelSceneRenderer {
     ctx.rotate(tilt);
     ctx.scale(1 + breathe * 0.5, 1 - breathe);
 
-    if (isSeated) {
-      ctx.save();
-      ctx.beginPath();
-      const clipBottomCut = 18 * scale;
-      ctx.rect(-cw / 2 - 4, -ch / 2 - 4, cw + 8, ch - clipBottomCut + 4);
-      ctx.clip();
-      ctx.drawImage(spriteImg, -cw / 2, -ch / 2, cw, ch);
-      ctx.restore();
+    const drawX = -Math.round(cw / 2);
+    const drawY = -Math.round(ch / 2);
+
+    if (isSeated && loc.pose === 'sit') {
+      // Khi ngồi ghế: giữ nguyên chân đặt tự nhiên trên thanh gác chân ghế bar (Quán phố), không cắt cụt chân
+      if (spriteKey === 'lam') {
+        ctx.drawImage(spriteImg, drawX, drawY, cw, ch);
+      } else {
+        ctx.save();
+        ctx.beginPath();
+        const clipBottomCut = Math.round(10 * scale);
+        ctx.rect(drawX - 4, drawY - 4, cw + 8, ch - clipBottomCut + 4);
+        ctx.clip();
+        ctx.drawImage(spriteImg, drawX, drawY, cw, ch);
+        ctx.restore();
+      }
     } else {
-      ctx.drawImage(spriteImg, -cw / 2, -ch / 2, cw, ch);
+      // Khi đang đi (walk_in/walk_out) hoặc đứng: vẽ nguyên vẹn 100% sprite (chân, giày đầy đủ, không cắt)
+      ctx.drawImage(spriteImg, drawX, drawY, cw, ch);
     }
 
     // Draw Drink in Hand if customer received drink
@@ -1558,17 +1606,25 @@ class PixelSceneRenderer {
 
     ctx.save();
 
-    // 1. If Hoi An, draw Water Hazard SafeZone Box (x < 400 && y > 195)
+    // 1. If Hoi An, draw Water Hazard SafeZone Box & Wooden Bridge Entryway
     if (this.theme === 'hoian') {
       ctx.strokeStyle = 'rgba(239, 68, 68, 0.75)';
       ctx.lineWidth = 1.5;
       ctx.setLineDash([4, 4]);
-      ctx.strokeRect(0, 195, 400, 165);
+      ctx.strokeRect(0, 195, 240, 165);
       ctx.fillStyle = 'rgba(239, 68, 68, 0.10)';
-      ctx.fillRect(0, 195, 400, 165);
+      ctx.fillRect(0, 195, 240, 165);
       ctx.fillStyle = '#f87171';
       ctx.font = '11px "VT323", monospace, sans-serif';
-      ctx.fillText('⚠️ VÙNG SÔNG NƯỚC (x < 400 & y > 195) - CẤM ĐI QUA', 12, 212);
+      ctx.fillText('⚠️ VÙNG SÔNG SÂU', 12, 212);
+
+      // Wooden bridge safe pathway marker
+      ctx.strokeStyle = '#22c55e';
+      ctx.strokeRect(240, 270, 140, 80);
+      ctx.fillStyle = 'rgba(34, 197, 94, 0.12)';
+      ctx.fillRect(240, 270, 140, 80);
+      ctx.fillStyle = '#4ade80';
+      ctx.fillText('🌉 CẦU GỖ LỐI VÀO (SPAWN)', 246, 285);
     }
 
     // 2. Waypoint route dashed path
@@ -1624,7 +1680,30 @@ class PixelSceneRenderer {
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    // 5. Top-Left HUD Card
+    // 5. Thước đo tỉ lệ nhân vật (Character Height Ruler)
+    const charDisplayHeight = Math.round(108 * (loc.scale || 1.0));
+    const rulerX = Math.round(loc.x + (loc.facing === 1 ? 32 : -32));
+    const rulerBottom = Math.round(loc.y);
+    const rulerTop = rulerBottom - charDisplayHeight;
+
+    ctx.strokeStyle = '#facc15';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(rulerX, rulerBottom);
+    ctx.lineTo(rulerX, rulerTop);
+    ctx.moveTo(rulerX - 4, rulerBottom);
+    ctx.lineTo(rulerX + 4, rulerBottom);
+    ctx.moveTo(rulerX - 4, rulerTop);
+    ctx.lineTo(rulerX + 4, rulerTop);
+    ctx.moveTo(rulerX - 3, Math.round((rulerBottom + rulerTop) / 2));
+    ctx.lineTo(rulerX + 3, Math.round((rulerBottom + rulerTop) / 2));
+    ctx.stroke();
+
+    ctx.fillStyle = '#fef08a';
+    ctx.font = '10px "VT323", monospace, sans-serif';
+    ctx.fillText(`H:${charDisplayHeight}px`, rulerX + (loc.facing === 1 ? 5 : -35), Math.round((rulerBottom + rulerTop) / 2) + 3);
+
+    // 6. Top-Left HUD Card
     ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
     ctx.strokeStyle = 'rgba(56, 189, 248, 0.6)';
     ctx.lineWidth = 1;
@@ -1637,10 +1716,10 @@ class PixelSceneRenderer {
 
     ctx.fillStyle = '#f8fafc';
     ctx.fillText(`Phase: ${loc.phase} | Pose: ${loc.pose} | Facing: ${loc.facing > 0 ? 'Phải 👉' : 'Trái 👈'}`, 14, 35);
-    ctx.fillText(`Vị trí: (${Math.round(loc.x)}, ${Math.round(loc.y)}) | Scale: ${loc.scale ? loc.scale.toFixed(2) : '1.00'}`, 14, 48);
+    ctx.fillText(`Vị trí: (${Math.round(loc.x)}, ${Math.round(loc.y)}) | Scale: ${loc.scale ? loc.scale.toFixed(2) : '1.00'} (${charDisplayHeight}px)`, 14, 48);
     ctx.fillText(`Quãng đường: ${Math.round(loc.distance)} / ${Math.round(loc.totalDistance)} px`, 14, 60);
 
-    // 6. Cursor position if hovering on canvas
+    // 7. Cursor position if hovering on canvas
     if (this.mouseDebug) {
       ctx.fillStyle = '#fde047';
       ctx.font = '10px "VT323", monospace, sans-serif';
@@ -1757,10 +1836,10 @@ const SCENE_CONFIGS = {
     targetX: 185,
     targetY: 283,
     route: {
-      entry: { x: -50, y: 283, scale: 0.95 },
+      entry: { x: -50, y: 283, scale: 0.88 },
       waypoints: [{ x: 60, y: 283 }],
       seat: { x: 185, y: 283, pose: 'stand' },
-      scaleNear: 1.0
+      scaleNear: 0.90
     },
     cat: { baked: true, x: 500, y: 275, w: 90, h: 45 },
     customer: {
@@ -1801,12 +1880,13 @@ const SCENE_CONFIGS = {
     targetX: 225,
     targetY: 280,
     route: {
-      entry: { x: -50, y: 280, scale: 0.95 },
+      entry: { x: -50, y: 280, scale: 0.82 },
       waypoints: [{ x: 90, y: 280 }],
       seat: { x: 225, y: 280, pose: 'stand' },
-      scaleNear: 1.0
+      scaleNear: 0.85
     },
-    cat: { baked: false, x: 510, y: 285, w: 38, h: 26 },
+    // Mèo nằm trên mặt ghế quầy bar (neo ở tâm mặt ghế cushion, bóng rơi trên mặt ghế)
+    cat: { baked: false, x: 488, y: 218, w: 38, h: 26, spotName: 'stool_cushion' },
     customer: {
       id: 'hoa-student',
       spriteKey: 'hoa',
@@ -1842,15 +1922,23 @@ const SCENE_CONFIGS = {
   indoor: {
     key: 'indoor',
     name: '🏬 Quán Phố Hiện Đại (Rộn Ràng)',
-    targetX: 321,
-    targetY: 272,
+    targetX: 335,
+    targetY: 278,
+    // Vị trí cửa vào (door) đã định nghĩa trong scene để spawn từ cửa
+    door: { x: 228, y: 238, scale: 0.48 },
     route: {
-      entry: { x: 228, y: 188, scale: 0.55 },
-      waypoints: [{ x: 250, y: 215 }, { x: 300, y: 255 }],
-      seat: { x: 321, y: 272, pose: 'sit', facing: -1 },
-      scaleNear: 1.0
+      entry: { x: 228, y: 238, scale: 0.48 },
+      waypoints: [{ x: 255, y: 250 }, { x: 295, y: 268 }],
+      seat: { x: 335, y: 278, pose: 'sit', facing: -1 },
+      scaleNear: 0.74
     },
-    cat: { baked: false, x: 485, y: 290, w: 38, h: 26 },
+    // Danh sách các ô sàn trống đã định nghĩa sẵn, tránh các vật/bàn ghế/chậu cây
+    catSpots: [
+      { x: 230, y: 315, w: 38, h: 26, name: 'floor_window' },
+      { x: 180, y: 310, w: 38, h: 26, name: 'floor_planter' },
+      { x: 275, y: 295, w: 38, h: 26, name: 'floor_mat' }
+    ],
+    cat: { baked: false, x: 230, y: 315, w: 38, h: 26 },
     customer: {
       id: 'lam-dev',
       spriteKey: 'lam',
@@ -1888,10 +1976,10 @@ const SCENE_CONFIGS = {
     targetX: 170,
     targetY: 313,
     route: {
-      entry: { x: -50, y: 313, scale: 0.95 },
+      entry: { x: -50, y: 313, scale: 0.85 },
       waypoints: [{ x: 70, y: 313 }],
       seat: { x: 170, y: 313, pose: 'stand' },
-      scaleNear: 1.0
+      scaleNear: 0.85
     },
     cat: { baked: false, x: 435, y: 285, w: 38, h: 26 },
     customer: {
@@ -1927,15 +2015,18 @@ const SCENE_CONFIGS = {
   hoian: {
     key: 'hoian',
     name: '🏮 Hoàng Hôn Bờ Sông Hội An (Bờ Sông Hoài)',
-    targetX: 433,
-    targetY: 270,
+    targetX: 420,
+    targetY: 268,
+    // Điểm vào từ đầu cầu gỗ trên sông Hoài đi lên quán
+    bridge: { x: 260, y: 328, scale: 0.72 },
     route: {
-      entry: { x: 520, y: 150, scale: 0.55 },
-      waypoints: [{ x: 480, y: 170 }, { x: 445, y: 240 }],
-      seat: { x: 433, y: 270, pose: 'sit', facing: -1 },
-      scaleNear: 1.0
+      entry: { x: 260, y: 328, scale: 0.72 },
+      waypoints: [{ x: 310, y: 300 }, { x: 365, y: 280 }],
+      seat: { x: 420, y: 268, pose: 'sit', facing: -1 },
+      scaleNear: 0.76
     },
-    cat: { baked: false, x: 465, y: 280, w: 38, h: 26 },
+    // Mèo đứng trên mặt đất bờ sông, dưới mép bàn tre, tránh hoàn toàn bát đĩa đồ ăn
+    cat: { baked: false, x: 385, y: 320, w: 38, h: 26, spotName: 'ground_patio' },
     customer: {
       id: 'lan-merchant',
       spriteKey: 'hoa',
@@ -1981,9 +2072,10 @@ function validateRouteSafeZone(themeKey, route) {
 
   pts.forEach(({ pt, name }) => {
     if (!pt) return;
-    // Hoi An water hazard: x < 400 && y > 190
-    if (themeKey === 'hoian' && pt.x < 400 && pt.y > 190) {
-      console.warn(`[SafeZone Hazard] Scene "${themeKey}" point "${name}" (${pt.x}, ${pt.y}) is inside the river area! Must have x >= 400 or y <= 190.`);
+    // Hoi An water hazard: deep water outside patio (x >= 400) and wooden pier (x in [240, 380], y in [270, 350])
+    const onPierOrPatio = (pt.x >= 240 && pt.x <= 380 && pt.y >= 270 && pt.y <= 350) || pt.x >= 400 || pt.y <= 190;
+    if (themeKey === 'hoian' && !onPierOrPatio) {
+      console.warn(`[SafeZone Hazard] Scene "${themeKey}" point "${name}" (${pt.x}, ${pt.y}) is inside deep river water! Must be on patio (x >= 400) or wooden bridge (x: 240-380, y: 270-350).`);
     }
   });
 }
@@ -2244,6 +2336,11 @@ class GameController {
     clearTimeout(this.catHappyTimer);
     clearTimeout(this.catAwakeTimer);
     this.catState = 'sleep';
+
+    // Đặt mèo vào ô sàn trống hợp lý, tránh các đồ vật
+    if (sceneCfg.catSpots && sceneCfg.catSpots.length > 0) {
+      sceneCfg.cat = { baked: false, ...sceneCfg.catSpots[0] };
+    }
 
     // 1. Update Renderer & Audio
     this.renderer.setTheme(themeKey, sceneCfg);
@@ -2905,11 +3002,56 @@ class GameController {
     // Condensed milk
     condensedBottom.style.height = (this.cup.condensedMilk * 18) + '%';
 
+    // Name status
+    let currentDrinkName = this.identifyDrinkName();
+    cupStatus.textContent = currentDrinkName;
+
+    // Bảng màu chất lỏng theo món (getDrinkColor)
+    const drinkColor = getDrinkColor(currentDrinkName);
+
+    // Condensed milk layer
+    if (this.cup.condensedMilk > 0) {
+      if (this.cup.coffee === 0 && this.cup.tea === 0) {
+        // Uống sữa đặc nóng riêng lẻ: dâng cao lớp sữa
+        condensedBottom.style.height = Math.min(80, this.cup.condensedMilk * 35) + '%';
+        condensedBottom.style.backgroundColor = drinkColor;
+      } else {
+        condensedBottom.style.height = (this.cup.condensedMilk * 18) + '%';
+        condensedBottom.style.backgroundColor = '#fffbeb';
+      }
+    } else {
+      condensedBottom.style.height = '0%';
+    }
+
     // Coffee layer
-    layerCoffee.style.height = (this.cup.coffee * 35) + '%';
+    if (this.cup.coffee > 0) {
+      layerCoffee.style.height = (this.cup.coffee * 35) + '%';
+      layerCoffee.style.opacity = '1';
+      if (this.cup.stirred && this.cup.condensedMilk > 0) {
+        layerCoffee.classList.add('liquid-mixed');
+        layerCoffee.style.backgroundColor = '#a16207';
+        condensedBottom.style.height = '0%';
+      } else {
+        layerCoffee.classList.remove('liquid-mixed');
+        layerCoffee.style.backgroundColor = (this.cup.saltCream > 0) ? '#3d2314' : drinkColor;
+      }
+    } else if (this.cup.ice > 0 && this.cup.condensedMilk === 0 && this.cup.tea === 0) {
+      // Ly đá không: hiển thị lớp nước đá trong suốt mát lạnh
+      layerCoffee.style.height = '65%';
+      layerCoffee.style.backgroundColor = drinkColor;
+      layerCoffee.style.opacity = '0.55';
+    } else {
+      layerCoffee.style.height = '0%';
+      layerCoffee.classList.remove('liquid-mixed');
+    }
 
     // Tea layer
-    layerTea.style.height = (this.cup.tea * 55) + '%';
+    if (this.cup.tea > 0) {
+      layerTea.style.height = (this.cup.tea * 55) + '%';
+      layerTea.style.backgroundColor = (this.cup.peach > 0) ? '#ea580c' : drinkColor;
+    } else {
+      layerTea.style.height = '0%';
+    }
 
     // Egg foam layer
     layerEgg.style.height = (this.cup.eggFroth > 0 ? 30 : 0) + '%';
@@ -2917,16 +3059,6 @@ class GameController {
     // Salt cream layer
     if (layerSalt) {
       layerSalt.style.height = (this.cup.saltCream > 0 ? 25 : 0) + '%';
-    }
-
-    // Stirred color transition
-    if (this.cup.stirred) {
-      if (this.cup.condensedMilk > 0 && this.cup.coffee > 0) {
-        layerCoffee.classList.add('liquid-mixed');
-        condensedBottom.style.height = '0%';
-      }
-    } else {
-      layerCoffee.classList.remove('liquid-mixed');
     }
 
     // Ice cubes
@@ -2954,9 +3086,6 @@ class GameController {
       layerGarnish.style.opacity = '0';
     }
 
-    // Name status
-    let currentDrinkName = this.identifyDrinkName();
-    cupStatus.textContent = currentDrinkName;
 
     // Hint text
     const hasIngredients = this.cup.condensedMilk > 0 || this.cup.coffee > 0 || this.cup.tea > 0 || this.cup.eggFroth > 0 || this.cup.saltCream > 0 || this.cup.food > 0;
