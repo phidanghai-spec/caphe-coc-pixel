@@ -9,6 +9,13 @@ function computeMasterGain(muted, volume) {
   return Math.max(0, Math.min(1, v));
 }
 
+function computeFadeGain(startTime, now, duration, from, to) {
+  if (now <= startTime) return from;
+  if (duration <= 0 || now >= startTime + duration) return to;
+  const progress = (now - startTime) / duration;
+  return from + (to - from) * progress;
+}
+
 const AUDIO_GAINS = {
   AMBIENT: 0.08,
   DIALOGUE: 0.02,
@@ -22,6 +29,7 @@ const INTERACT_GAIN = AUDIO_GAINS.INTERACT;
 
 if (typeof window !== 'undefined') {
   window.computeMasterGain = computeMasterGain;
+  window.computeFadeGain = computeFadeGain;
   window.AUDIO_GAINS = AUDIO_GAINS;
   window.AMBIENT_GAIN = AMBIENT_GAIN;
   window.DIALOGUE_GAIN = DIALOGUE_GAIN;
@@ -30,6 +38,7 @@ if (typeof window !== 'undefined') {
 }
 if (typeof module !== 'undefined' && module.exports) {
   module.exports.computeMasterGain = computeMasterGain;
+  module.exports.computeFadeGain = computeFadeGain;
   module.exports.AUDIO_GAINS = AUDIO_GAINS;
   module.exports.AMBIENT_GAIN = AMBIENT_GAIN;
   module.exports.DIALOGUE_GAIN = DIALOGUE_GAIN;
@@ -50,6 +59,8 @@ class SoundEngine {
     this.isLofiPlaying = false;
     this.lofiInterval = null;
     this.ambientSource = null;
+    this.ambientGainNode = null;
+    this.ambientNodes = [];
   }
 
   init() {
@@ -89,34 +100,97 @@ class SoundEngine {
   }
 
   setAmbientTheme(theme) {
+    if (this.ambientType === theme) return;
     this.ambientType = theme;
-    if (this.isAmbientPlaying) {
+
+    if (!this.isAmbientPlaying) return;
+
+    // Crossfade 600ms
+    const fadeDuration = 0.6;
+    if (this.ctx && this.ambientGainNode) {
+      const now = this.ctx.currentTime;
+      const oldGain = this.ambientGainNode;
+      const oldSource = this.ambientSource;
+      const oldTimer = this.ambientTimer;
+      const oldNodes = this.ambientNodes || [];
+
+      if (oldGain && oldGain.gain) {
+        try {
+          oldGain.gain.cancelScheduledValues(now);
+          oldGain.gain.setValueAtTime(oldGain.gain.value, now);
+          oldGain.gain.linearRampToValueAtTime(0, now + fadeDuration);
+        } catch (_) {}
+      }
+
+      if (oldTimer) {
+        clearInterval(oldTimer);
+      }
+
+      setTimeout(() => {
+        if (oldSource) {
+          try { oldSource.stop(); } catch (_) {}
+          try { oldSource.disconnect(); } catch (_) {}
+        }
+        if (oldGain) {
+          try { oldGain.disconnect(); } catch (_) {}
+        }
+        oldNodes.forEach(node => {
+          try { if (node.stop) node.stop(); } catch (_) {}
+          try { if (node.disconnect) node.disconnect(); } catch (_) {}
+        });
+      }, fadeDuration * 1000 + 50);
+
+      this.ambientGainNode = null;
+      this.ambientSource = null;
+      this.ambientTimer = null;
+      this.ambientNodes = [];
+      this.isAmbientPlaying = false;
+      this.startAmbient(fadeDuration);
+    } else {
       this.stopAmbient();
       this.startAmbient();
     }
   }
 
-  startAmbient() {
+  startAmbient(fadeDuration = 0) {
     this.init();
     if (this.isAmbientPlaying) return;
 
     if (this.ambientType === 'morning') {
-      this.startBirdsAmbient();
+      this.startBirdsAmbient(fadeDuration);
     } else if (this.ambientType === 'hoian') {
-      this.startRiverAmbient();
+      this.startRiverAmbient(fadeDuration);
     } else if (this.ambientType === 'counter' || this.ambientType === 'indoor') {
-      this.startCafeIndoorAmbient();
+      this.startCafeIndoorAmbient(fadeDuration);
     } else {
-      this.startRainAmbient();
+      this.startRainAmbient(fadeDuration);
     }
     this.isAmbientPlaying = true;
   }
 
   stopAmbient() {
+    if (this.ambientGainNode && this.ctx) {
+      try {
+        const now = this.ctx.currentTime;
+        this.ambientGainNode.gain.cancelScheduledValues(now);
+        this.ambientGainNode.gain.setValueAtTime(0, now);
+      } catch (_) {}
+    }
     if (this.ambientSource) {
       try { this.ambientSource.stop(); } catch(e){}
-      this.ambientSource.disconnect();
+      try { this.ambientSource.disconnect(); } catch(e){}
       this.ambientSource = null;
+    }
+    if (this.ambientGainNode) {
+      try { this.ambientGainNode.disconnect(); } catch(e){}
+      this.ambientGainNode = null;
+    }
+    if (this.ambientNodes && this.ambientNodes.length) {
+      this.ambientNodes.forEach(node => {
+        try { if (node.stop) node.stop(); } catch (_) {}
+        try { if (node.disconnect) node.disconnect(); } catch (_) {}
+      });
+      this.ambientNodes = [];
     }
     if (this.ambientTimer) {
       clearInterval(this.ambientTimer);
@@ -126,7 +200,7 @@ class SoundEngine {
   }
 
   // Realistic Procedural Rain (Pink Noise)
-  startRainAmbient() {
+  startRainAmbient(fadeDuration = 0) {
     const bufferSize = this.ctx.sampleRate * 2;
     const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
     const output = noiseBuffer.getChannelData(0);
@@ -153,7 +227,13 @@ class SoundEngine {
     filter.frequency.value = 900;
 
     const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(AMBIENT_GAIN, this.ctx.currentTime);
+    const targetGain = AMBIENT_GAIN;
+    if (fadeDuration > 0) {
+      gain.gain.setValueAtTime(0, this.ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(targetGain, this.ctx.currentTime + fadeDuration);
+    } else {
+      gain.gain.setValueAtTime(targetGain, this.ctx.currentTime);
+    }
 
     whiteNoise.connect(filter);
     filter.connect(gain);
@@ -161,23 +241,25 @@ class SoundEngine {
     whiteNoise.start();
 
     this.ambientSource = whiteNoise;
+    this.ambientGainNode = gain;
+    this.ambientNodes = [whiteNoise, filter, gain];
   }
 
-  startBirdsAmbient() {
+  startBirdsAmbient(fadeDuration = 0) {
     // Gentle morning breeze + occasional chirp
-    this.startRainAmbient(); // use soft wind base
+    this.startRainAmbient(fadeDuration); // use soft wind base
     this.ambientTimer = setInterval(() => {
       if (!this.isAmbientPlaying) return;
       this.playChirp();
     }, 3500);
   }
 
-  startRiverAmbient() {
+  startRiverAmbient(fadeDuration = 0) {
     // Soft water lapping
-    this.startRainAmbient();
+    this.startRainAmbient(fadeDuration);
   }
 
-  startCafeIndoorAmbient() {
+  startCafeIndoorAmbient(fadeDuration = 0) {
     // Warm indoor cafe atmosphere: filtered pink noise + occasional gentle cup/spoon tinks
     const bufferSize = this.ctx.sampleRate * 2;
     const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
@@ -192,12 +274,20 @@ class SoundEngine {
     filter.type = 'lowpass';
     filter.frequency.value = 450;
     const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(AMBIENT_GAIN * 0.75, this.ctx.currentTime);
+    const targetGain = AMBIENT_GAIN * 0.75;
+    if (fadeDuration > 0) {
+      gain.gain.setValueAtTime(0, this.ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(targetGain, this.ctx.currentTime + fadeDuration);
+    } else {
+      gain.gain.setValueAtTime(targetGain, this.ctx.currentTime);
+    }
     noise.connect(filter);
     filter.connect(gain);
     gain.connect(this.getMasterOutput());
     noise.start();
     this.ambientSource = noise;
+    this.ambientGainNode = gain;
+    this.ambientNodes = [noise, filter, gain];
 
     this.ambientTimer = setInterval(() => {
       if (!this.isAmbientPlaying) return;
