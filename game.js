@@ -8,11 +8,33 @@ function computeMasterGain(muted, volume) {
   if (isNaN(v)) return 0;
   return Math.max(0, Math.min(1, v));
 }
+
+const AUDIO_GAINS = {
+  AMBIENT: 0.08,
+  DIALOGUE: 0.02,
+  EVENT: 0.12,
+  INTERACT: 0.10
+};
+const AMBIENT_GAIN = AUDIO_GAINS.AMBIENT;
+const DIALOGUE_GAIN = AUDIO_GAINS.DIALOGUE;
+const EVENT_GAIN = AUDIO_GAINS.EVENT;
+const INTERACT_GAIN = AUDIO_GAINS.INTERACT;
+
 if (typeof window !== 'undefined') {
   window.computeMasterGain = computeMasterGain;
+  window.AUDIO_GAINS = AUDIO_GAINS;
+  window.AMBIENT_GAIN = AMBIENT_GAIN;
+  window.DIALOGUE_GAIN = DIALOGUE_GAIN;
+  window.EVENT_GAIN = EVENT_GAIN;
+  window.INTERACT_GAIN = INTERACT_GAIN;
 }
 if (typeof module !== 'undefined' && module.exports) {
   module.exports.computeMasterGain = computeMasterGain;
+  module.exports.AUDIO_GAINS = AUDIO_GAINS;
+  module.exports.AMBIENT_GAIN = AMBIENT_GAIN;
+  module.exports.DIALOGUE_GAIN = DIALOGUE_GAIN;
+  module.exports.EVENT_GAIN = EVENT_GAIN;
+  module.exports.INTERACT_GAIN = INTERACT_GAIN;
 }
 
 // --- 1. PROCEDURAL SOUND ENGINE (Web Audio API) ---
@@ -131,7 +153,7 @@ class SoundEngine {
     filter.frequency.value = 900;
 
     const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.18, this.ctx.currentTime);
+    gain.gain.setValueAtTime(AMBIENT_GAIN, this.ctx.currentTime);
 
     whiteNoise.connect(filter);
     filter.connect(gain);
@@ -170,7 +192,7 @@ class SoundEngine {
     filter.type = 'lowpass';
     filter.frequency.value = 450;
     const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+    gain.gain.setValueAtTime(AMBIENT_GAIN * 0.75, this.ctx.currentTime);
     noise.connect(filter);
     filter.connect(gain);
     gain.connect(this.getMasterOutput());
@@ -191,7 +213,7 @@ class SoundEngine {
     const gain = this.ctx.createGain();
     osc.type = 'sine';
     osc.frequency.setValueAtTime(1900 + Math.random() * 500, now);
-    gain.gain.setValueAtTime(0.02, now);
+    gain.gain.setValueAtTime(INTERACT_GAIN * 0.3, now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
     osc.connect(gain);
     gain.connect(this.getMasterOutput());
@@ -208,7 +230,7 @@ class SoundEngine {
     osc.frequency.exponentialRampToValueAtTime(3200, now + 0.08);
     osc.frequency.exponentialRampToValueAtTime(2600, now + 0.15);
 
-    gain.gain.setValueAtTime(0.04, now);
+    gain.gain.setValueAtTime(INTERACT_GAIN * 0.4, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
 
     osc.connect(gain);
@@ -249,7 +271,7 @@ class SoundEngine {
 
         const now = this.ctx.currentTime;
         gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(0.04, now + 0.8);
+        gain.gain.linearRampToValueAtTime(AMBIENT_GAIN * 0.5, now + 0.8);
         gain.gain.exponentialRampToValueAtTime(0.001, now + 3.8);
 
         osc.connect(filter);
@@ -284,7 +306,7 @@ class SoundEngine {
     osc.frequency.setValueAtTime(950, now);
     osc.frequency.exponentialRampToValueAtTime(450, now + 0.08);
 
-    gain.gain.setValueAtTime(0.14, now);
+    gain.gain.setValueAtTime(INTERACT_GAIN * 1.2, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
 
     osc.connect(gain);
@@ -304,7 +326,7 @@ class SoundEngine {
     osc.frequency.setValueAtTime(400 + Math.random() * 200, now);
     osc.frequency.exponentialRampToValueAtTime(200, now + 0.06);
 
-    gain.gain.setValueAtTime(0.1, now);
+    gain.gain.setValueAtTime(INTERACT_GAIN, now);
     gain.gain.exponentialRampToValueAtTime(0.01, now + 0.06);
 
     osc.connect(gain);
@@ -323,7 +345,7 @@ class SoundEngine {
     osc.frequency.setValueAtTime(type === 'coffee' ? 240 : 420, now);
     osc.frequency.exponentialRampToValueAtTime(120, now + 0.35);
 
-    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.setValueAtTime(INTERACT_GAIN * 1.1, now);
     gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
 
     osc.connect(gain);
@@ -341,7 +363,7 @@ class SoundEngine {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq + Math.random() * 80, now + idx * 0.05);
 
-      gain.gain.setValueAtTime(0.1, now + idx * 0.05);
+      gain.gain.setValueAtTime(INTERACT_GAIN, now + idx * 0.05);
       gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.05 + 0.15);
 
       osc.connect(gain);
@@ -360,7 +382,7 @@ class SoundEngine {
       osc.type = 'sine';
       osc.frequency.setValueAtTime(800 + (i % 2) * 300, now + i * 0.1);
 
-      gain.gain.setValueAtTime(0.06, now + i * 0.1);
+      gain.gain.setValueAtTime(INTERACT_GAIN * 0.7, now + i * 0.1);
       gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 0.08);
 
       osc.connect(gain);
@@ -379,7 +401,7 @@ class SoundEngine {
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(f, now + idx * 0.09);
 
-      gain.gain.setValueAtTime(0.1, now + idx * 0.09);
+      gain.gain.setValueAtTime(EVENT_GAIN, now + idx * 0.09);
       gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.09 + 0.3);
 
       osc.connect(gain);
@@ -396,7 +418,7 @@ class SoundEngine {
     const gain = this.ctx.createGain();
     osc.type = 'triangle';
     osc.frequency.setValueAtTime(650 + Math.random() * 200, now);
-    gain.gain.setValueAtTime(0.012, now);
+    gain.gain.setValueAtTime(DIALOGUE_GAIN, now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.035);
     osc.connect(gain);
     gain.connect(this.getMasterOutput());
@@ -414,7 +436,7 @@ class SoundEngine {
     osc.frequency.exponentialRampToValueAtTime(820, now + 0.15);
     osc.frequency.exponentialRampToValueAtTime(520, now + 0.45);
     gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(0.09, now + 0.05);
+    gain.gain.linearRampToValueAtTime(INTERACT_GAIN * 0.9, now + 0.05);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
     osc.connect(gain);
     gain.connect(this.getMasterOutput());
@@ -430,7 +452,7 @@ class SoundEngine {
     osc.type = 'square';
     osc.frequency.setValueAtTime(1400, now);
     osc.frequency.setValueAtTime(750, now + 0.06);
-    gain.gain.setValueAtTime(0.12, now);
+    gain.gain.setValueAtTime(EVENT_GAIN, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
     osc.connect(gain);
     gain.connect(this.getMasterOutput());
@@ -446,7 +468,7 @@ class SoundEngine {
       const gain = this.ctx.createGain();
       osc.type = 'sine';
       osc.frequency.setValueAtTime(f, now + idx * 0.08);
-      gain.gain.setValueAtTime(0.08, now + idx * 0.08);
+      gain.gain.setValueAtTime(EVENT_GAIN * 0.75, now + idx * 0.08);
       gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.25);
       osc.connect(gain);
       gain.connect(this.getMasterOutput());
