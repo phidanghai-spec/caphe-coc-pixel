@@ -61,6 +61,7 @@ class SoundEngine {
     this.ambientSource = null;
     this.ambientGainNode = null;
     this.ambientNodes = [];
+    this.lofiNodes = [];
   }
 
   init() {
@@ -377,6 +378,13 @@ class SoundEngine {
         filter.connect(gain);
         gain.connect(this.getMasterOutput());
 
+        this.lofiNodes.push(osc, filter, gain);
+        setTimeout(() => {
+          if (this.lofiNodes) {
+            this.lofiNodes = this.lofiNodes.filter(n => n !== osc && n !== filter && n !== gain);
+          }
+        }, 4100);
+
         osc.start(now);
         osc.stop(now + 4);
       });
@@ -391,6 +399,13 @@ class SoundEngine {
     if (this.lofiInterval) {
       clearInterval(this.lofiInterval);
       this.lofiInterval = null;
+    }
+    if (this.lofiNodes && this.lofiNodes.length) {
+      this.lofiNodes.forEach(node => {
+        try { if (node && typeof node.stop === 'function') node.stop(); } catch (_) {}
+        try { if (node && typeof node.disconnect === 'function') node.disconnect(); } catch (_) {}
+      });
+      this.lofiNodes = [];
     }
   }
 
@@ -575,6 +590,13 @@ class SoundEngine {
       osc.stop(now + idx * 0.08 + 0.3);
     });
   }
+}
+
+if (typeof window !== 'undefined') {
+  window.SoundEngine = SoundEngine;
+}
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports.SoundEngine = SoundEngine;
 }
 
 // --- 2. AGENT SPRITE FORGE: SPRITE ATLAS LOADER & CLIP PLAYER ---
