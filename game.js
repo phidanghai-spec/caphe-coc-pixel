@@ -65,19 +65,28 @@ class SoundEngine {
 
   init() {
     if (!this.ctx) {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (AudioContext) {
-        this.ctx = new AudioContext();
-      }
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) {
+          this.ctx = new AudioContext();
+        }
+      } catch (_) {}
     }
     if (this.ctx && !this.masterGain) {
-      this.masterGain = this.ctx.createGain();
-      const initialGain = computeMasterGain(this.isMuted, this.masterVolume);
-      this.masterGain.gain.setValueAtTime(initialGain, this.ctx.currentTime || 0);
-      this.masterGain.connect(this.ctx.destination);
+      try {
+        this.masterGain = this.ctx.createGain();
+        const initialGain = computeMasterGain(this.isMuted, this.masterVolume);
+        this.masterGain.gain.setValueAtTime(initialGain, this.ctx.currentTime || 0);
+        this.masterGain.connect(this.ctx.destination);
+      } catch (_) {}
     }
     if (this.ctx && this.ctx.state === 'suspended') {
-      try { this.ctx.resume(); } catch (_) {}
+      try {
+        const p = this.ctx.resume();
+        if (p && typeof p.catch === 'function') {
+          p.catch(() => {});
+        }
+      } catch (_) {}
     }
   }
 
@@ -2404,12 +2413,24 @@ class GameController {
       }
     });
 
-    // Auto-start audio on first user gesture
-    document.body.addEventListener('click', () => {
-      if (!this.sound.ctx) {
-        this.sound.startAmbient();
+    // Auto-start / resume audio on first user gesture
+    const unlockAudio = () => {
+      if (this.sound) {
+        this.sound.init();
+        if (this.sound.ctx && this.sound.ctx.state === 'suspended') {
+          try {
+            const p = this.sound.ctx.resume();
+            if (p && typeof p.catch === 'function') p.catch(() => {});
+          } catch (_) {}
+        }
+        if (!this.sound.isAmbientPlaying) {
+          this.sound.startAmbient();
+        }
       }
-    }, { once: true });
+    };
+    ['click', 'touchstart', 'pointerdown', 'keydown'].forEach(evt => {
+      window.addEventListener(evt, unlockAudio, { once: true, passive: true });
+    });
 
     // Shop Modal triggers
     document.getElementById('btn-open-shop').addEventListener('click', () => this.openShopModal());
