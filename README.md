@@ -87,7 +87,13 @@ caphe-coc-pixel/
 
 - [x] **Tuần 1:** MVP Quầy pha chế tương tác, 5 bối cảnh, Barista hands, Procedural Audio, Locomotion nhân vật.
 - [x] **Khởi động Tuần 2:** Chương 1 cốt truyện "Chiếc ô vàng", chuẩn hóa sprite và bối cảnh.
-- [ ] **Tuần 2:** Chương 2 mở rộng (bí mật tình xưa, biểu cảm chân dung động, tích hợp Sprite Atlas từ `agent-sprite-forge`).
+- [x] **Tuần 2:** Chương 2 mở rộng (bí mật tình xưa, biểu cảm chân dung động, tích hợp Sprite Atlas từ `agent-sprite-forge`).
+- [x] **Chương 3 — Những lá thư:**
+  - Cô Lan viết thư hồi âm, Bác Ba nhận được.
+  - App của Hoa và Lâm ra mắt.
+  - Chú Vinh chụp ảnh cuối với chiếc Wave.
+  - Khi đủ 4 mạch, game hiện thông báo hoàn thành (cờ `chuong3_xong`).
+  - Trạng thái: đã hoàn thành.
 - [ ] **Tuần 3:** Chu kỳ ngày - đêm động, sự kiện ngẫu nhiên đường phố (cúp điện, mưa rào trú mưa, dọn bàn vỉa hè).
 - [ ] **Tuần 4:** Đóng gói PWA (chơi offline toàn màn hình điện thoại) & Triển khai lên Vercel/GitHub Pages.
 
