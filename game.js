@@ -2,10 +2,26 @@
 // CÀ PHÊ CÓC VỈA HÈ - COZY PIXEL ENGINE (TUẦN 1 HOÀN THIỆN)
 // ==========================================
 
+function computeMasterGain(muted, volume) {
+  if (muted) return 0;
+  const v = typeof volume === 'number' ? volume : 1;
+  if (isNaN(v)) return 0;
+  return Math.max(0, Math.min(1, v));
+}
+if (typeof window !== 'undefined') {
+  window.computeMasterGain = computeMasterGain;
+}
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports.computeMasterGain = computeMasterGain;
+}
+
 // --- 1. PROCEDURAL SOUND ENGINE (Web Audio API) ---
 class SoundEngine {
   constructor() {
     this.ctx = null;
+    this.masterGain = null;
+    this.isMuted = false;
+    this.masterVolume = 1.0;
     this.rainGain = null;
     this.ambientType = 'rain'; // 'rain', 'birds', 'river'
     this.isAmbientPlaying = false;
@@ -17,11 +33,37 @@ class SoundEngine {
   init() {
     if (!this.ctx) {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
-      this.ctx = new AudioContext();
+      if (AudioContext) {
+        this.ctx = new AudioContext();
+      }
     }
-    if (this.ctx.state === 'suspended') {
-      this.ctx.resume();
+    if (this.ctx && !this.masterGain) {
+      this.masterGain = this.ctx.createGain();
+      const initialGain = computeMasterGain(this.isMuted, this.masterVolume);
+      this.masterGain.gain.setValueAtTime(initialGain, this.ctx.currentTime || 0);
+      this.masterGain.connect(this.ctx.destination);
     }
+    if (this.ctx && this.ctx.state === 'suspended') {
+      try { this.ctx.resume(); } catch (_) {}
+    }
+  }
+
+  getMasterOutput() {
+    this.init();
+    return this.masterGain || (this.ctx ? this.ctx.destination : null);
+  }
+
+  setMuted(muted) {
+    this.isMuted = !!muted;
+    if (this.masterGain && this.ctx) {
+      const target = computeMasterGain(this.isMuted, this.masterVolume);
+      this.masterGain.gain.setValueAtTime(target, this.ctx.currentTime);
+    }
+  }
+
+  toggleMute() {
+    this.setMuted(!this.isMuted);
+    return this.isMuted;
   }
 
   setAmbientTheme(theme) {
@@ -93,7 +135,7 @@ class SoundEngine {
 
     whiteNoise.connect(filter);
     filter.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getMasterOutput());
     whiteNoise.start();
 
     this.ambientSource = whiteNoise;
@@ -131,7 +173,7 @@ class SoundEngine {
     gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
     noise.connect(filter);
     filter.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getMasterOutput());
     noise.start();
     this.ambientSource = noise;
 
@@ -152,7 +194,7 @@ class SoundEngine {
     gain.gain.setValueAtTime(0.02, now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getMasterOutput());
     osc.start(now);
     osc.stop(now + 0.4);
   }
@@ -170,7 +212,7 @@ class SoundEngine {
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
 
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getMasterOutput());
     osc.start(now);
     osc.stop(now + 0.2);
   }
@@ -212,7 +254,7 @@ class SoundEngine {
 
         osc.connect(filter);
         filter.connect(gain);
-        gain.connect(this.ctx.destination);
+        gain.connect(this.getMasterOutput());
 
         osc.start(now);
         osc.stop(now + 4);
@@ -246,7 +288,7 @@ class SoundEngine {
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
 
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getMasterOutput());
     osc.start(now);
     osc.stop(now + 0.1);
   }
@@ -266,7 +308,7 @@ class SoundEngine {
     gain.gain.exponentialRampToValueAtTime(0.01, now + 0.06);
 
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getMasterOutput());
     osc.start(now);
     osc.stop(now + 0.07);
   }
@@ -285,7 +327,7 @@ class SoundEngine {
     gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
 
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getMasterOutput());
     osc.start(now);
     osc.stop(now + 0.4);
   }
@@ -303,7 +345,7 @@ class SoundEngine {
       gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.05 + 0.15);
 
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getMasterOutput());
       osc.start(now + idx * 0.05);
       osc.stop(now + idx * 0.05 + 0.2);
     });
@@ -322,7 +364,7 @@ class SoundEngine {
       gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 0.08);
 
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getMasterOutput());
       osc.start(now + i * 0.1);
       osc.stop(now + i * 0.1 + 0.1);
     }
@@ -341,7 +383,7 @@ class SoundEngine {
       gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.09 + 0.3);
 
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getMasterOutput());
       osc.start(now + idx * 0.09);
       osc.stop(now + idx * 0.09 + 0.35);
     });
@@ -357,7 +399,7 @@ class SoundEngine {
     gain.gain.setValueAtTime(0.012, now);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.035);
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getMasterOutput());
     osc.start(now);
     osc.stop(now + 0.04);
   }
@@ -375,7 +417,7 @@ class SoundEngine {
     gain.gain.linearRampToValueAtTime(0.09, now + 0.05);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getMasterOutput());
     osc.start(now);
     osc.stop(now + 0.55);
   }
@@ -391,7 +433,7 @@ class SoundEngine {
     gain.gain.setValueAtTime(0.12, now);
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
     osc.connect(gain);
-    gain.connect(this.ctx.destination);
+    gain.connect(this.getMasterOutput());
     osc.start(now);
     osc.stop(now + 0.15);
   }
@@ -407,7 +449,7 @@ class SoundEngine {
       gain.gain.setValueAtTime(0.08, now + idx * 0.08);
       gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.25);
       osc.connect(gain);
-      gain.connect(this.ctx.destination);
+      gain.connect(this.getMasterOutput());
       osc.start(now + idx * 0.08);
       osc.stop(now + idx * 0.08 + 0.3);
     });
@@ -2210,6 +2252,20 @@ class GameController {
     });
 
     // Audio toggles
+    const btnMute = document.getElementById('btn-toggle-mute');
+    if (btnMute) {
+      btnMute.addEventListener('click', () => {
+        const isMuted = this.sound.toggleMute();
+        if (isMuted) {
+          btnMute.classList.add('muted');
+          btnMute.innerHTML = '🔇 <span class="btn-text">Âm lượng: TẮT</span>';
+        } else {
+          btnMute.classList.remove('muted');
+          btnMute.innerHTML = '🔊 <span class="btn-text">Âm lượng: BẬT</span>';
+        }
+      });
+    }
+
     const btnAmbient = document.getElementById('btn-toggle-ambient');
     btnAmbient.addEventListener('click', () => {
       if (this.sound.isAmbientPlaying) {
