@@ -818,19 +818,18 @@ body {
 }
 
 .dish-label {
-  position: absolute;
-  bottom: -16px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 0.65rem;
+  position: relative;
+  margin-top: 6px;
+  font-size: 0.72rem;
   font-family: var(--pixel-font);
   color: #fef08a;
   background: rgba(15, 23, 42, 0.95);
   border: 1px solid var(--accent-amber);
   border-radius: 8px;
-  padding: 2px 8px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.7);
+  padding: 3px 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.7);
   white-space: nowrap;
+  text-align: center;
   z-index: 10;
   pointer-events: none;
 }

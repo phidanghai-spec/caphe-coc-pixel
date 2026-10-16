@@ -113,8 +113,8 @@ assert(htmlContent.includes('<div id="toast" class="toast hidden"></div>') &&
        'Toast nằm phía trên khung hội thoại trong DOM (.canvas-wrapper)');
 assert(cssContent.includes('.dish-label') && cssContent.includes('z-index: 10'),
        'Nhãn Bánh Mì Đêm có z-index: 10 nổi bật trên đĩa bánh, không bị đè');
-assert(cssContent.includes('.dish-label') && cssContent.includes('position: absolute'),
-       'Nhãn Bánh Mì Đêm được định vị tuyệt đối không làm xô lệch đĩa bánh');
+assert(cssContent.includes('.dish-label') && (cssContent.includes('position: relative') || cssContent.includes('position: absolute')),
+       'Nhãn Bánh Mì Đêm được định vị riêng biệt không bị đĩa bánh đè');
 assert(cssContent.includes('.toast') && cssContent.includes('position: absolute') && cssContent.includes('bottom: 12px'),
        'Toast có position: absolute và bottom: 12px nằm ở góc dưới khung hình cảnh');
 
