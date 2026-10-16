@@ -1886,7 +1886,7 @@ const SCENE_CONFIGS = {
       scaleNear: 0.85
     },
     // Mèo nằm trên mặt ghế quầy bar (neo ở tâm mặt ghế cushion, bóng rơi trên mặt ghế)
-    cat: { baked: false, x: 494, y: 226, w: 38, h: 26, spotName: 'stool_cushion' },
+    cat: { baked: false, x: 488, y: 218, w: 38, h: 26, spotName: 'stool_cushion' },
     customer: {
       id: 'hoa-student',
       spriteKey: 'hoa',

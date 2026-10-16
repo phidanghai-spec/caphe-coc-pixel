@@ -101,7 +101,37 @@ assert(hoianCfg.route.entry.x === 260 && hoianCfg.route.entry.y === 328, 'Hoàng
 assert(hoianCfg.route.seat.x === 420 && hoianCfg.route.seat.y === 268, 'Hoàng Hôn: Điểm ngồi ghế bàn tre đón khách hợp lý');
 assert(hoianCfg.route.scaleNear <= 0.80, 'Hoàng Hôn: Tỉ lệ nhân vật cân đối với bàn ghế tre');
 
-// --- 5. TỔNG KẾT ---
+// --- 5. KIỂM TRA TOAST VÀ NHÃN MÓN ĂN (DISH LABEL) ---
+console.log('\n5. Kiểm tra Toast & Nhãn Bánh Mì Đêm:');
+const cssPath = path.join(__dirname, '..', 'style.css');
+const cssContent = fs.readFileSync(cssPath, 'utf8');
+const htmlPath = path.join(__dirname, '..', 'index.html');
+const htmlContent = fs.readFileSync(htmlPath, 'utf8');
+
+assert(htmlContent.includes('<div id="toast" class="toast hidden"></div>') &&
+       htmlContent.indexOf('<div id="toast"') < htmlContent.indexOf('id="dialogue-box"'),
+       'Toast nằm phía trên khung hội thoại trong DOM (.canvas-wrapper)');
+assert(cssContent.includes('.dish-label') && cssContent.includes('z-index: 10'),
+       'Nhãn Bánh Mì Đêm có z-index: 10 nổi bật trên đĩa bánh, không bị đè');
+assert(cssContent.includes('.dish-label') && cssContent.includes('position: absolute'),
+       'Nhãn Bánh Mì Đêm được định vị tuyệt đối không làm xô lệch đĩa bánh');
+assert(cssContent.includes('.toast') && cssContent.includes('position: absolute') && cssContent.includes('bottom: 12px'),
+       'Toast có position: absolute và bottom: 12px nằm ở góc dưới khung hình cảnh');
+
+// Kiểm tra chi tiết tọa độ mèo quầy bar
+assert(counterCfg.cat.x === 488 && counterCfg.cat.y === 218,
+       'Quầy Bar Gỗ: Tọa độ mèo chính xác tại (x: 488, y: 218) trên tâm đệm ghế bar');
+
+// Kiểm tra chuỗi waypoint cảnh Hoàng Hôn
+const hoianWaypoints = hoianCfg.route.waypoints;
+assert(Array.isArray(hoianWaypoints) && hoianWaypoints.length === 2,
+       'Hoàng Hôn: Có đủ 2 waypoints trung gian dẫn từ đầu cầu lên bàn tre');
+assert(hoianWaypoints[0].x === 310 && hoianWaypoints[0].y === 300,
+       'Hoàng Hôn: Waypoint 1 tại (310, 300) bước lên thềm quán');
+assert(hoianWaypoints[1].x === 365 && hoianWaypoints[1].y === 280,
+       'Hoàng Hôn: Waypoint 2 tại (365, 280) đi dọc hành lang bàn tre');
+
+// --- 6. TỔNG KẾT ---
 console.log('\n====================================================');
 console.log(`KẾT QUẢ KIỂM TRA HIỂN THỊ: ${passed} PASS, ${failed} FAIL`);
 console.log('====================================================');

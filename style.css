@@ -818,12 +818,21 @@ body {
 }
 
 .dish-label {
-  font-size: 0.6rem;
+  position: absolute;
+  bottom: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.65rem;
   font-family: var(--pixel-font);
-  color: var(--accent-warm);
-  margin-top: 4px;
-  text-align: center;
+  color: #fef08a;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid var(--accent-amber);
+  border-radius: 8px;
+  padding: 2px 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.7);
   white-space: nowrap;
+  z-index: 10;
+  pointer-events: none;
 }
 
 /* Glass Cup with Ribbed Pattern & Liquid Vortex */
@@ -1264,27 +1273,32 @@ body {
   color: #cbd5e1;
 }
 
-/* Toast */
+/* Toast - Chuyển xuống góc dưới khung hình cảnh, phía trên khu vực hội thoại */
 .toast {
-  position: fixed;
-  bottom: 24px;
+  position: absolute;
+  bottom: 12px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(15, 23, 42, 0.95);
+  background: rgba(15, 23, 42, 0.96);
   border: 1px solid var(--accent-amber);
   color: var(--text-main);
-  padding: 10px 20px;
+  padding: 8px 18px;
   border-radius: 30px;
-  font-size: 0.9rem;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
-  z-index: 100;
-  transition: opacity 0.3s, transform 0.3s;
+  font-size: 0.85rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85);
+  z-index: 30;
+  pointer-events: none;
+  white-space: nowrap;
+  max-width: 90%;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 .toast.hidden {
   opacity: 0;
   pointer-events: none;
-  transform: translate(-50%, 20px);
+  transform: translate(-50%, 14px);
 }
 
 /* Animations */

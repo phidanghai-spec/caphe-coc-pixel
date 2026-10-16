@@ -57,6 +57,8 @@
           <canvas id="cafe-canvas" width="640" height="360"></canvas>
           <div class="scanline-overlay"></div>
           <div class="weather-tag" id="weather-status">🌧️ Đêm Mưa Vỉa Hè (Phố Khuya)</div>
+          <!-- Notification Toast: góc dưới khung hình cảnh, phía trên khung hội thoại -->
+          <div id="toast" class="toast hidden"></div>
         </div>
         <button id="btn-quick-pet-cat" class="btn-canvas-cat" title="Vuốt ve chú mèo Miu Miu">
           🐾 Vuốt ve mèo Miu Miu
@@ -264,8 +266,7 @@
       </div>
     </div>
 
-    <!-- Notification Toast -->
-    <div id="toast" class="toast hidden"></div>
+    <!-- Notification Toast moved to .canvas-wrapper -->
   </div>
 
   <script src="story.js"></script>
