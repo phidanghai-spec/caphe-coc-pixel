@@ -2758,6 +2758,14 @@ class GameController {
         setTimeout(() => this.showToast('📖 Chương 3: App của Hoa & Lâm ra mắt!'), 650);
       } else if (choice.effects.vinh_chup_anh && !this.story.flags.vinh_chup_anh) {
         setTimeout(() => this.showToast('📖 Chương 3: Tấm ảnh cuối với chiếc Wave!'), 650);
+      } else if (choice.effects.vinh_nhuong_wave && !this.story.flags.vinh_nhuong_wave) {
+        setTimeout(() => this.showToast('📖 Chương 4: Chiếc Wave trao gửi chủ mới!'), 650);
+      } else if (choice.effects.app_danh_gia && !this.story.flags.app_danh_gia) {
+        setTimeout(() => this.showToast('📖 Chương 4: Góp ý hoàn thiện ứng dụng!'), 650);
+      } else if (choice.effects.ba_ve_hoi_an && !this.story.flags.ba_ve_hoi_an) {
+        setTimeout(() => this.showToast('📖 Chương 4: Bác Ba chuẩn bị về Hội An!'), 650);
+      } else if (choice.effects.lan_cong_thuc && !this.story.flags.lan_cong_thuc) {
+        setTimeout(() => this.showToast('📖 Chương 4: Bí quyết công thức Trà Mót!'), 650);
       }
     }
 
@@ -2767,6 +2775,9 @@ class GameController {
     }
     if (event === 'chuong3') {
       this.showToast('🏁 Chương 3 hoàn thành: Những lá thư đã đến tay người nhận!');
+    }
+    if (event === 'chuong4') {
+      this.showToast('🏁 Chương 4 hoàn thành: Chiếc Wave đã có chủ mới.');
     }
   }
 
